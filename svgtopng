@@ -2,6 +2,7 @@
 
 #
 # Converts an .svg image to a high-resolution .png image
+# Relies on inkscape being installed.
 #
 
 die () {

@@ -1,5 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-BND_JAR="${HOME}/bin/bndlib/bnd-1.50.0.jar"
+dir=$(dirname ${0})
+BND_JAR="${dir}/bndlib/bnd-1.50.0.jar"
 java -jar $BND_JAR $@
 
