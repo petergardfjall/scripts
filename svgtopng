@@ -1,0 +1,17 @@
+#!/bin/bash
+
+#
+# Converts an .svg image to a high-resolution .png image
+#
+
+die () {
+    echo -e >&2 "$@"
+    exit 1
+}
+
+[ "$#" -eq 2 ] || die "error: 1 argument required, $# provided.\n Usage: ${0} <source svg image> <destination png image>"
+
+INFILE=$1
+OUTFILE=$2
+
+inkscape --export-use-hints --export-area-drawing --export-dpi=200 --export-png=${OUTFILE} ${INFILE}

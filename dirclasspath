@@ -1,0 +1,26 @@
+#! /bin/bash
+
+#
+# Writes a classpath to stdout containing all jar files in a given directory.
+#
+
+if [ "${1}" = "" ]; then
+    echo "error: missing argument: directory"
+    exit 1
+fi
+dir=${1}
+
+if [ ! -d "${dir}" ]; then
+    echo "error: directory '${dir}' doesn't exist"
+    exit 1
+fi
+
+
+cp="";
+jarfiles=$(find ${dir} -maxdepth 1 -name '*.jar')
+for jarfile in ${jarfiles}
+do
+   cp="${cp}:${jarfile}"
+done
+
+echo ${cp}

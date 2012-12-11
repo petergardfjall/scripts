@@ -1,0 +1,5 @@
+#!/bin/sh
+
+BND_JAR="${HOME}/bin/bndlib/bnd-1.50.0.jar"
+java -jar $BND_JAR $@
+

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [ $# -lt 2 ]; then
+  echo "error: missing argument(s)"
+  echo "usage: ${0} <groupId> <artifactId>"
+  exit 1
+fi
+
+group_id=${1}
+artifact_id=${2}
+
+mvn archetype:generate -DgroupId=${group_id} -DartifactId=${artifact_id} -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
