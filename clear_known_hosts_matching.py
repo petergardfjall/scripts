@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+#
+# Note: in order for this script to work you need to make
+# sure that host names are written to your known_hosts file.
+# This is accomplished by setting "HashKnownHosts no" in your
+# /etc/ssh/ssh_config. Refer to 'man ssh_config' for details.
+#
+
 import logging
 import re
 import optparse
