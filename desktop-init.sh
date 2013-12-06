@@ -71,15 +71,16 @@ function switch_workspace() {
 switch_workspace 0 0
 thunderbird &
 skype &
-sleep 10
+sleep 15
 
 switch_workspace 1 0
 ~/bin/devterms.sh
+sleep 5
 
 # bottom-left workspace
 switch_workspace 0 1
 chromium-browser &
-sleep 2
+sleep 10
 
 # finally, switch back to top-left workspace
 switch_workspace 0 0
