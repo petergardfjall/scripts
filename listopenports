@@ -4,4 +4,4 @@
 # Lists all open TCP and UDP listening ports and to which process each belong.
 #
 
-netstat -lnptu
+sudo netstat -lnptu
