@@ -16,14 +16,26 @@ DEFAULT_LOGFILE="httpd.log"
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s", stream=sys.stdout)
 log = logging.getLogger()
 
+request_count = 0
+
+class HttpServer(SocketServer.TCPServer):
+    # prevent "Address already in use" error when restarting the server program
+    # after a socket has been opened
+    allow_reuse_address = True
 
 class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def do_GET(self):
+        global request_count
+        request_count += 1 
+        log.info("received request %d", request_count)
         log.info(self.headers)
         SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
     def do_POST(self):
+        global request_count
+        request_count += 1
+        log.info("received request %d", request_count)
         log.info(self.headers)
         self.log_request()
         content_len = int(self.headers.getheader('content-length'))
@@ -60,10 +72,15 @@ if __name__ == "__main__":
     
     # start http server   
     Handler = ServerHandler
-    httpd = SocketServer.TCPServer(("", options.port), Handler)
+    httpd = HttpServer(("", options.port), Handler)
     log.debug("Listening on port %d" % options.port)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt, e:
         log.debug("Interrupted by user. Shutting down ...")
+    finally:
+        log.debug("shutting down server ...")
+        httpd.shutdown()
+        log.debug("server shut down.")
+
             
