@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#
+# Lists all open TCP and UDP listening ports and to which process each belong.
+#
+
+netstat -lnptu
+
+if [ "$UID" -ne 0 ]; then
+  echo
+  echo "************************************************"
+  echo "Note: for all open ports, run as privileged user"
+  echo "************************************************"
+fi
