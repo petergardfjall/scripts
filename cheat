@@ -99,8 +99,8 @@ def do_list(args):
         print("\n".join(commands))
 
 
-def do_sections(args):
-    log.debug("sections: %s", args)
+def do_toc(args):
+    log.debug("toc: %s", args)
     sheet_path = os.path.join(args.sheet_dir, args.command + ".cheat")
     if not os.path.isfile(sheet_path):
         print("error: no cheat sheet for command '%s' exists at '%s'" %
@@ -126,9 +126,6 @@ if __name__ == "__main__":
     # list sub-command
     list_parser = subparsers.add_parser(
         "list", help="List available cheat sheets.")
-    list_parser.add_argument(
-        "-s", "--sections", action="store_true", default=False,
-        help="Show available sections for each command.")
     # function to invoke after parsing subcommand
     list_parser.set_defaults(handler=do_list)
     
@@ -148,14 +145,14 @@ if __name__ == "__main__":
     # function to invoke after parsing subcommand
     show_parser.set_defaults(handler=do_show)
 
-    # sections sub-command
-    sections_parser = subparsers.add_parser(
-        "sections", help="Lists all cheat sheet sections for a command.")
-    sections_parser.add_argument(
+    # toc sub-command
+    toc_parser = subparsers.add_parser(
+        "toc", help="Lists cheat sheet sections for a command.")
+    toc_parser.add_argument(
         "command", metavar="<COMMAND>", type=str, 
         help="The command for which to list all cheat sheet sections.")
     # function to invoke after parsing subcommand
-    sections_parser.set_defaults(handler=do_sections)
+    toc_parser.set_defaults(handler=do_toc)
     
     args = parser.parse_args()
 
