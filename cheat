@@ -1,0 +1,172 @@
+#!/usr/bin/env python
+
+import argparse
+import collections
+import itertools
+import logging
+import os
+import re
+import sys
+
+DEFAULT_CHEAT_SHEET_PATH = "~/dotfiles/cheat/sheets"
+DEFAULT_CHEAT_SHEET_DIR = os.path.expanduser(DEFAULT_CHEAT_SHEET_PATH)
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)5s] %(message)s")
+log = logging.getLogger(__name__)
+
+class CheatSheet(object):
+    def __init__(self, path):
+        self.sections = self._parse(path)
+
+    def get(self, section=None, section_num=None):
+        """Returns the contents of the cheat sheet. Either the contents
+        of a specific section (if a section is given) or the entire
+        :class:`CheatSheet` if no section is given.
+
+        :keyword section: The section to get, or `None` to get the entire
+          :class:`CheatSheet`.
+        :type section: str
+        :keyword section_num: The index of the section to get, or `None`.
+        :type section_num: int
+
+        :rtype: str
+        """
+        if not section and section_num is None:
+            # print the root section
+            return self._content("/")
+
+        if section:
+            return self._content(self.sections[section])
+        else:
+            section_header = self.sections.keys()[section_num]
+            return self._content(section_header)
+                
+
+    def _content(self, section_header):
+        return '\n'.join(self.sections[section_header])
+        
+    def list_sections(self):
+        """Returns all section headers of this cheat sheet."""
+        return self.sections.keys()
+    
+    def _parse(self, path):
+        """Parses a `.cheat` file.
+        
+        :return: A dictionary with section headers as keys and the content
+          of each section as values (list of lines).
+        :rtype: dict of list of str
+        """
+        sections = collections.OrderedDict()
+        with open(path) as cheatsheet:
+            # root section contains entire document
+            sections["/"] = []
+            # collects lines in the current section being processed
+            curr_section = None
+            section_lines = []
+            for line in cheatsheet:
+                sections["/"].append(line.strip())
+                # new section encountered?
+                new_section = re.match(r'^(#+)(.*)$', line.strip())
+                if new_section:
+                    # prepare for new section
+                    curr_section = new_section.group(2).strip()
+                    sections[curr_section] = [line.strip()]
+                else:
+                    if curr_section:
+                        sections[curr_section].append(line.strip())
+        return sections
+
+    
+        
+def do_show(args):
+    log.debug("show: %s", args)
+    sheet_path = os.path.join(args.sheet_dir, args.command + ".cheat")
+    if not os.path.isfile(sheet_path):
+        print("error: no cheat sheet for command '%s' exists at '%s'" %
+              (args.command, sheet_path))
+        sys.exit(1)
+
+    cheatsheet = CheatSheet(sheet_path)
+    print(cheatsheet.get(section=args.section, section_num=args.section_num))
+
+
+def do_list(args):
+    log.debug("list: %s", args)
+    files = os.listdir(args.sheet_dir)
+    commands = [os.path.splitext(f)[0] for f in files if f.endswith(".cheat")]
+    if commands:
+        print("\n".join(commands))
+
+
+def do_sections(args):
+    log.debug("sections: %s", args)
+    sheet_path = os.path.join(args.sheet_dir, args.command + ".cheat")
+    if not os.path.isfile(sheet_path):
+        print("error: no cheat sheet for command '%s' exists at '%s'" %
+              (args.command, sheet_path))
+        sys.exit(1)
+
+    cheatsheet = CheatSheet(sheet_path)
+    for index, section in enumerate(cheatsheet.list_sections()):
+        print("[%d] %s" % (index, section))
+    
+        
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Prints cheat sheets for different commands/programs.")
+    parser.add_argument("--sheet-dir", metavar="<DIR>", type=str,
+                        default=DEFAULT_CHEAT_SHEET_DIR,
+                        help=("The directory where all cheat sheets "
+                              "are stored. Default: %s." %
+                              DEFAULT_CHEAT_SHEET_PATH))
+    
+    subparsers = parser.add_subparsers()
+    # list sub-command
+    list_parser = subparsers.add_parser(
+        "list", help="List available cheat sheets.")
+    list_parser.add_argument(
+        "-s", "--sections", action="store_true", default=False,
+        help="Show available sections for each command.")
+    # function to invoke after parsing subcommand
+    list_parser.set_defaults(handler=do_list)
+    
+    # show sub-command
+    show_parser = subparsers.add_parser(
+        "show", help="Show a particular cheat sheet.")
+    show_parser.add_argument(
+        "command", metavar="<COMMAND>", type=str, 
+        help="The command for which to show a cheat sheet.")
+    show_parser.add_argument(
+        "-s", "--section", metavar="<SECTION>", type=str, 
+        help="Only show a given section of the cheat sheet.")
+    show_parser.add_argument(
+        "-n", "--section-num", metavar="<NUM>", type=int, 
+        help="Only show a given section (specified by number) of the cheat sheet.")
+    
+    # function to invoke after parsing subcommand
+    show_parser.set_defaults(handler=do_show)
+
+    # sections sub-command
+    sections_parser = subparsers.add_parser(
+        "sections", help="Lists all cheat sheet sections for a command.")
+    sections_parser.add_argument(
+        "command", metavar="<COMMAND>", type=str, 
+        help="The command for which to list all cheat sheet sections.")
+    # function to invoke after parsing subcommand
+    sections_parser.set_defaults(handler=do_sections)
+    
+    args = parser.parse_args()
+
+    # validate sheet directory
+    if not os.path.exists(args.sheet_dir):
+        raise RuntimeError(
+            "The cheat sheet directory '%s' does not exist" % args.sheet_dir)
+    if not os.path.isdir(args.sheet_dir):
+        raise RuntimeError(
+            "The specified cheat sheet directory '%s' is not a directory" %
+            args.sheet_dir)
+        
+    args.handler(args)
+
