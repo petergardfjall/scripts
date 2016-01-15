@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #
-# Send an email with SSL and authentication.
+# Email sending client.
 #
 
 import argparse
@@ -17,9 +17,7 @@ from email.mime.text import MIMEText
 LOG = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    format=("%(asctime)s [%(levelname)s] "
-            #"[%(threadName)s:%(name)s:%(funcName)s:%(lineno)d] "
-            "%(message)s"),
+    format=("%(asctime)s [%(levelname)s] %(message)s"),
     stream=sys.stdout)
 
 
@@ -98,6 +96,3 @@ if __name__ == "__main__":
         LOG.info("email sent.")
     finally:
         mailserver.quit()
-        
-                        
-
