@@ -56,7 +56,7 @@ if __name__ == "__main__":
     if not args.fromaddr:
         args.fromaddr = raw_input("From: ")
     if not args.subject:
-        args.fromaddr = raw_input("Subject: ")
+        args.subject = raw_input("Subject: ")
 
     args.lines = []
     if args.message_file:
