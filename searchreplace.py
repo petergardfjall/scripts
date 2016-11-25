@@ -44,6 +44,12 @@ def search_and_replace(filepath, searchfor, replacewith, options={}):
     os.remove(copypath)
 
 
+def is_secret(dirpath):
+    if dirpath == '/':
+        return False
+    dirname = os.path.basename(dirpath)
+    parent = os.path.dirname(dirpath)
+    return dirname.startswith('.') or is_secret(parent)
 
 
 if __name__ == "__main__":
@@ -58,7 +64,8 @@ if __name__ == "__main__":
     parser = optparse.OptionParser(usage=usage)
     parser.add_option("--rootdir", dest="rootdir",
                   help="The directory where the tree search will start. "\
-                    "Default: '.'", metavar="DIR", default=".")
+                      "Default: ${PWD}", metavar="DIR",
+                      default=os.environ["PWD"])
     parser.add_option("--pattern", dest="pattern",
                   help="Only files matching this regular expression will "\
                       "be acted upon. Default: '.*$' (process any file/dir except ones with leading '.')", metavar="REGEXP", default=r".*$")
@@ -81,13 +88,10 @@ if __name__ == "__main__":
     log.info("Searching for files matching '{0}' starting at '{1}'. " 
              "Occurrences of '{2}' will be replaced with '{3}'.".format(options.pattern, options.rootdir, searchfor, replacewith))
     for currdir, dirs, files in os.walk(options.rootdir):
-        dirname = os.path.basename(currdir)
-        # ignore secret directories:
-        # all directories with a leading '.' except cwd (".")
-        if not options.process_secret_dirs and dirname.startswith('.'):
-            if dirname != ".":                
-                log.info("ignoring secret directory %s", currdir)
-                continue
+        if is_secret(currdir) and not options.process_secret_dirs:
+            # ignore secret directory (leading '.')
+            log.info("ignoring secret directory %s", currdir)
+            continue
         
         files = [ f for f in files if re.match(options.pattern, f) ]
       
