@@ -50,7 +50,7 @@ if __name__ == "__main__":
     usage = """usage: %prog [options] <search-for> <replace-with>
 
     Replaces all occurences of a certain word with a replacement
-    word in files of an svn directory tree.
+    word in files of a directory tree.
 
     A file path filter (see --pattern) can be used to further limit the set of
     files that are considered for renaming.
@@ -61,7 +61,9 @@ if __name__ == "__main__":
                     "Default: '.'", metavar="DIR", default=".")
     parser.add_option("--pattern", dest="pattern",
                   help="Only files matching this regular expression will "\
-                      "be acted upon. Default: '.*$'", metavar="REGEXP", default=".*$")
+                      "be acted upon. Default: '.*$' (process any file/dir except ones with leading '.')", metavar="REGEXP", default=r".*$")
+    parser.add_option("--process-secret-dirs", action="store_true",
+                      help="Include secret directories (whose name starts with a leading dot '.'). Default is to ignore secret dirs.")
     parser.add_option("--dryrun", dest="dryrun", action="store_true",
                       help="Don't carry out any changes.")
     parser.add_option("--showdiffs", dest="showdiffs", action="store_true",
@@ -78,12 +80,19 @@ if __name__ == "__main__":
         log.info("Dry-run mode: no changes are carried out.")    
     log.info("Searching for files matching '{0}' starting at '{1}'. " 
              "Occurrences of '{2}' will be replaced with '{3}'.".format(options.pattern, options.rootdir, searchfor, replacewith))
-    for root, dirs, files in os.walk(options.rootdir):
+    for currdir, dirs, files in os.walk(options.rootdir):
+        dirname = os.path.basename(currdir)
+        # ignore secret directories:
+        # all directories with a leading '.' except cwd (".")
+        if not options.process_secret_dirs and dirname.startswith('.'):
+            if dirname != ".":                
+                log.info("ignoring secret directory %s", currdir)
+                continue
+        
         files = [ f for f in files if re.match(options.pattern, f) ]
-        # ignore files under .svn directories
-        files = [ f for f in files if not ".svn" in os.path.join(root, f) ]        
+      
         for dirfile in files:
-            filepath = os.path.join(root, dirfile)
+            filepath = os.path.join(currdir, dirfile)
             log.debug(filepath)
             search_and_replace(filepath, searchfor, replacewith, options)
     
