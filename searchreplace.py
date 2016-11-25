@@ -90,7 +90,7 @@ if __name__ == "__main__":
     for currdir, dirs, files in os.walk(options.rootdir):
         if is_secret(currdir) and not options.process_secret_dirs:
             # ignore secret directory (leading '.')
-            log.info("ignoring secret directory %s", currdir)
+            log.debug("ignoring secret directory %s", currdir)
             continue
         
         files = [ f for f in files if re.match(options.pattern, f) ]
