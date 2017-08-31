@@ -1,6 +1,11 @@
 #!/bin/bash
 
-
+#
+# A script that uses duplicity to back up a given set of local directories
+# to an Amazon S3 bucket.
+#
+# Run without arguments to see help text.
+#
 
 set -e
 
