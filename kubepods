@@ -1,0 +1,26 @@
+#!/bin/bash
+
+scriptname=$(basename ${0})
+
+OPTIONS=""
+for arg in $@; do
+    case ${arg} in
+	--all)
+	    OPTIONS="${OPTIONS} --all-namespaces"
+	    ;;
+	--help)	    
+	    echo "${scriptname}: [OPTIONS]"
+	    echo "shows which pods belong to which nodes"
+	    echo "Options:"
+	    echo "  --all     Show pods for in all namespaces"
+	    echo "  --help    Display help text"
+	    exit 0
+	    ;;
+	*)
+	    echo "unrecognized argument: ${arg}"
+	    exit 1
+	;;
+    esac
+done
+
+kubectl get pods ${OPTIONS} -o json | jq -r '.items[] | .spec.nodeName + ": " + .metadata.name' | sort
