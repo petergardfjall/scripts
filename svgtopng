@@ -5,14 +5,55 @@
 # Relies on inkscape being installed.
 #
 
-die () {
-    echo -e >&2 "$@"
+scriptname=$(basename ${0})
+
+background="#FFFFFF"
+opacity="1.0"
+
+function print_usage() {
+    echo "${scriptname} [OPTIONS] <source.svg> <dest.png>"
+    echo ""
+    echo "Options:"
+    echo "--background=COLOR  Background color to set. Default: ${background}."
+    echo "--opacity=VALUE     Background opacity (0.0 - 1.0). Default: ${opacity}."
+    echo "--help              Show help text"
+
+}
+
+function die() {
+    echo $@
+    echo ""
+    print_usage
     exit 1
 }
 
-[ "$#" -eq 2 ] || die "error: 1 argument required, $# provided.\n Usage: ${0} <source svg image> <destination png image>"
+for arg in $@; do
+    case ${arg} in
+	--background=*)
+	    background=${arg#*=}
+	    ;;
+	--opacity=*)
+	    opacity=${arg#*=}
+	    ;;
+	--help)
+	    print_usage
+	    exit 0
+	    ;;
+	--*)
+	    die "error: unrecognized option: ${arg}"
+	    ;;
+	*)
+	    # assume only positional arguments left
+	    break
+    esac
+    shift
+done
 
-INFILE=$1
-OUTFILE=$2
+[ "$#" -eq 2 ] || die "error: 2 argument(s) required, $# provided"
 
-inkscape --export-use-hints --export-area-drawing --export-background=#FFFFFF --export-dpi=200 --export-png=${OUTFILE} ${INFILE}
+source_svg=$1
+dest_png=$2
+
+[ "${source_svg}" = "${dest_png}" ] && die "error: source and destination are the same file"
+
+inkscape --export-use-hints --export-area-drawing --export-background=${background} --export-background-opacity=${opacity} --export-dpi=200 --export-png=${dest_png} ${source_svg}
