@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+
+kubectl get nodes -o json | jq -r '.items[] | .metadata.name + ":", .spec.taints'
+
+# a taint can be removed by an operation similar to:
+#   kubectl taint nodes worker1 node-about-to-be-drained:NoSchedule-
