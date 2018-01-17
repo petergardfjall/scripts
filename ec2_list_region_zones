@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#
+# Lists the availability zones found for each AWS region.
+#
+
+regions=$(aws ec2 describe-regions | jq -r '.[][].RegionName')
+if [ "${regions}" = "" ]; then
+    echo "error: failed to list regions: have you set up your aws cli environment?"
+    exit 1
+fi
+   
+for region in ${regions}; do
+    zones=$(aws ec2 describe-availability-zones --region ${region} | jq -r '.[][].ZoneName' | xargs echo)
+    echo "${region}: ${zones}"
+done
