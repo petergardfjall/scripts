@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#
+# Lists all instances over all regions.
+#
+# Note: user needs to have aws cli setup for use.
+#
+
+set -e
+
+regions=$(aws ec2 describe-regions | jq -r '.[][].RegionName')
+if [ "${regions}" = "" ]; then
+    echo "error: failed to list regions: have you set up your aws cli environment?"
+    exit 1
+fi
+
+for region in ${regions}; do
+    echo "### ${region} ###"
+    aws ec2 describe-instances --region ${region} | jq -r '.[][].Instances[] | { zone: .Placement.AvailabilityZone, name: (.Tags | .[] | select(.Key == "Name") | .Value), id: .InstanceId }' | jq -c
+done
