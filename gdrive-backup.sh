@@ -48,7 +48,7 @@ function die_with_error() {
     echo ""
     echo "To restore a certain backed up dir/file to a given point in time use"
     echo "(run as root to get restored file ownerships correct):"
-    echo "  # duplicity restore --no-encryption [--file-to-restore <relpath>] [--time <time>] pydrive://<google-account-mail>[/<folder>] <local_dest_dir>"
+    echo "  # duplicity restore --no-encryption [--file-to-restore <relpath>] [--time <time>] pydrive://<google-account-mail>:/<folder> <local_dest_dir>"
     exit 1
 }
 
