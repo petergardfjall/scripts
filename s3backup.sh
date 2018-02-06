@@ -24,6 +24,11 @@ function die_with_error() {
     echo "The following environment variables need to be set:"
     echo "  AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION."
     echo ""
+    echo "The following environment variables MAY be set:"
+    echo "  EXCLUDE_FILELIST=/path/to/exclude/filelist"
+    echo "This is a file listing file patterns that are to be exclued from"
+    echo "the backup. See the duplicity man page (FILE SELECTION)."
+    echo
     echo "The script produces a full backup every FULL_BACKUP_PERIOD days "
     echo "(default 14). The script will keep at most RETAINED_FULL_BACKUPS "
     echo "(default 2) full backup chains around in the targeted bucket.".
@@ -60,6 +65,15 @@ fi
 [[ "${AWS_SECRET_ACCESS_KEY}" = "" ]] && die_with_error "error: not set: AWS_SECRET_ACCESS_KEY"
 [[ "${AWS_DEFAULT_REGION}" = "" ]] && die_with_error "error: not set: AWS_DEFAULT_REGION"
 
+if [ "${EXCLUDE_FILELIST}" != "" ]; then
+    if ! [ -f ${EXCLUDE_FILELIST} ]; then
+	die_with_error "error: \${EXCLUDE_FILELIST} file does not exist: ${EXCLUDE_FILELIST}"
+    fi
+
+    EXCLUDE_FILELIST_OPT="--exclude-filelist=${EXCLUDE_FILELIST}"
+fi
+
+
 # Number of days between every time a new full backup chain is started.
 FULL_BACKUP_PERIOD=${FULL_BACKUP_PERIOD:-14}
 # Number of full backup chains to keep around.
@@ -84,6 +98,7 @@ log "backing up to ${S3_URL}"
 log "doing backup (full backup every ${FULL_BACKUP_PERIOD} days) ..."
 duplicity incremental --full-if-older-than ${FULL_BACKUP_PERIOD}D \
 	  --verbosity=warning --no-encryption --progress \
+	  ${EXCLUDE_FILELIST_OPT} \
 	  ${S3_OPTS} ${included_dirs} --exclude='**' / ${S3_URL}
 
 log "removing backups to keep only ${RETAINED_FULL_BACKUPS} full backup chains ..."
