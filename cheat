@@ -93,7 +93,7 @@ def do_show(args):
 
 def do_list(args):
     log.debug("list: %s", args)
-    files = os.listdir(args.sheet_dir)
+    files = sorted(os.listdir(args.sheet_dir))
     commands = [os.path.splitext(f)[0] for f in files if f.endswith(".cheat")]
     if commands:
         print("\n".join(commands))
