@@ -65,7 +65,7 @@ class CheatSheet(object):
             curr_section = None
             section_lines = []
             for line in cheatsheet:
-                sections["/"].append(line.strip())
+                sections["/"].append(line.rstrip())
                 # new section encountered?
                 new_section = re.match(r'^(#+)(.*)$', line.strip())
                 if new_section:
