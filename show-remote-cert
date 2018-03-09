@@ -1,0 +1,47 @@
+#!/bin/bash
+
+scriptname=$(basename ${0})
+
+port=443
+
+function print_usage() {
+    echo "${scriptname} [OPTIONS] <hostname/IP>"
+    echo
+    echo "Prints the TLS certificate of a remote host."
+    echo
+    echo "Options:"
+    echo "--port          The server TLS port. Default: ${port}."
+    echo "--help          Show this help text."
+    exit 1
+}
+
+for arg in ${@}; do
+    case ${arg} in
+	--port=*)
+	    port=${arg/*=/}
+	    ;;
+	--help)
+	    print_usage
+	    ;;
+	--*)
+	    echo "error: unrecognized option: ${arg}"
+	    print_usage
+	    ;;
+	*)
+	    # assume only positional arguments left
+	    break
+	    ;;
+    esac
+    shift
+done
+
+[ "${1}" = "" ] && echo "error: no <hostname/IP> argument given" && print_usage
+host=${1}
+
+echo | openssl s_client -showcerts -connect ${host}:${port} | \
+    openssl x509 -inform pem -noout -text
+
+if [ "${?}" != "0" ]; then
+    echo
+    echo "error: could not retrieve TLS cert from '${host}:${port}'"
+fi
