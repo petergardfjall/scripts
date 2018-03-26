@@ -30,7 +30,7 @@ function print_usage() {
     echo "                  Default: ${ssh_user}"
     echo "--ssh-key=PATH    SSH key used to login to master node."
     echo "                  Default: ${ssh_key}"
-    echo "--help            Displays this message."    
+    echo "--help            Displays this message."
 }
 
 for arg in ${@}; do
@@ -68,8 +68,8 @@ namespaces=$(ssh -i ${ssh_key} ${ssh_user}@${master} kubectl get ns -o jsonpath=
 log "found namespaces: ${namespaces}"
 for ns in ${namespaces}; do
     if echo ${ns} | egrep -v 'kube-system|default|kube-public'; then
-	log "deleting namespace ${ns} ..."
-	ssh -i ${ssh_key} ${ssh_user}@${master} kubectl delete ns ${ns}
+        log "deleting namespace ${ns} ..."
+        ssh -i ${ssh_key} ${ssh_user}@${master} kubectl delete ns ${ns}
     fi
 done
 
@@ -88,7 +88,7 @@ sudo weave reset --force
 sudo rm /opt/cni/bin/weave-*
 EOF
     log "${node}: reset weave ..."
-    ssh -t -i ${ssh_key} ${ssh_user}@${node} bash -s < /tmp/reset-weave.sh
+    ssh -i ${ssh_key} ${ssh_user}@${node} bash -s < /tmp/reset-weave.sh
     log "${node}: reset iptables ..."
     cat > /tmp/flush.sh <<EOF
 sudo iptables -F
@@ -99,6 +99,12 @@ sudo iptables -P INPUT ACCEPT
 sudo iptables -P FORWARD ACCEPT
 sudo iptables -P OUTPUT ACCEPT
 EOF
+    if ssh -i ${ssh_key} ${ssh_user}@${node} sudo systemctl status etcd.service > /dev/null; then
+        log "${node}: clearing etcd state ..."
+        ssh -i ${ssh_key} ${ssh_user}@${node} sudo systemctl stop etcd.service
+        # NOTE: assumed location of etcd --data-dir
+        ssh -i ${ssh_key} ${ssh_user}@${node} sudo rm -rf /var/lib/etcd/member
+    fi
     ssh -i ${ssh_key} ${ssh_user}@${node} bash -s < /tmp/flush.sh
     log "${node}: restart docker ..."
     ssh -t -i ${ssh_key} ${ssh_user}@${node} sudo systemctl restart docker
