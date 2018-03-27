@@ -63,24 +63,35 @@ log "ssh login key:  ${ssh_key}"
 [ -z ${1} ] && die_with_error "no HOST(s) given"
 
 master=${1}
+
+ssh_master="ssh -i ${ssh_key} ${ssh_user}@${master}"
+
 log "getting k8s namespaces from master ${master} ..."
-namespaces=$(ssh -i ${ssh_key} ${ssh_user}@${master} kubectl get ns -o jsonpath='{.items[*].metadata.name}')
+namespaces=$(${ssh_master} kubectl get ns -o jsonpath='{.items[*].metadata.name}')
 log "found namespaces: ${namespaces}"
 for ns in ${namespaces}; do
     if echo ${ns} | egrep -v 'kube-system|default|kube-public'; then
         log "deleting namespace ${ns} ..."
-        ssh -i ${ssh_key} ${ssh_user}@${master} kubectl delete ns ${ns}
+        ${ssh_master} kubectl delete ns ${ns}
+	# wait for namespace to be fully deleted (and allocated
+	# resources, such as volumes/loadbalancers to be released)
+	while ${ssh_master} kubectl get ns ${ns} > /dev/null; do
+	    log "waiting for namespace ${ns} to be deleted ..."
+	    sleep 10s
+	done
     fi
 done
 
 log "deleting weave daemonset ..."
-ssh -i ${ssh_key} ${ssh_user}@${master} kubectl delete ds -n kube-system weave-net
+${ssh_master} kubectl delete ds -n kube-system weave-net
 
 # clear each node
 for node in ${@}; do
+    ssh_node="ssh -i ${ssh_key} ${ssh_user}@${node}"
+
     log "clearing node ${node} ..."
     log "${node}: kubeadm reset ..."
-    ssh -t -i ${ssh_key} ${ssh_user}@${node} sudo kubeadm reset
+    ${ssh_node} sudo kubeadm reset
     cat > /tmp/reset-weave.sh <<EOF
 sudo curl -fsSL git.io/weave -o /usr/local/bin/weave
 sudo chmod +x /usr/local/bin/weave
@@ -88,7 +99,7 @@ sudo weave reset --force
 sudo rm /opt/cni/bin/weave-*
 EOF
     log "${node}: reset weave ..."
-    ssh -i ${ssh_key} ${ssh_user}@${node} bash -s < /tmp/reset-weave.sh
+    ${ssh_node} bash -s < /tmp/reset-weave.sh
     log "${node}: reset iptables ..."
     cat > /tmp/flush.sh <<EOF
 sudo iptables -F
@@ -99,15 +110,15 @@ sudo iptables -P INPUT ACCEPT
 sudo iptables -P FORWARD ACCEPT
 sudo iptables -P OUTPUT ACCEPT
 EOF
-    if ssh -i ${ssh_key} ${ssh_user}@${node} sudo systemctl status etcd.service > /dev/null; then
+    if ${ssh_node} sudo systemctl status etcd.service > /dev/null; then
         log "${node}: clearing etcd state ..."
-        ssh -i ${ssh_key} ${ssh_user}@${node} sudo systemctl stop etcd.service
+        ${ssh_node} sudo systemctl stop etcd.service
         # NOTE: assumed location of etcd --data-dir
-        ssh -i ${ssh_key} ${ssh_user}@${node} sudo rm -rf /var/lib/etcd/member
+        ${ssh_node} sudo rm -rf /var/lib/etcd/member
     fi
-    ssh -i ${ssh_key} ${ssh_user}@${node} bash -s < /tmp/flush.sh
+    ${ssh_node} bash -s < /tmp/flush.sh
     log "${node}: restart docker ..."
-    ssh -t -i ${ssh_key} ${ssh_user}@${node} sudo systemctl restart docker
+    ${ssh_node} sudo systemctl restart docker
     log "${node}: uninstall kubelet kubeadm ..."
-    ssh -t -i ${ssh_key} ${ssh_user}@${node} sudo apt-get purge -y kubelet kubeadm
+    ${ssh_node} sudo apt-get purge -y kubelet kubeadm
 done
