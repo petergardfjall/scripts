@@ -73,12 +73,12 @@ for ns in ${namespaces}; do
     if echo ${ns} | egrep -v 'kube-system|default|kube-public'; then
         log "deleting namespace ${ns} ..."
         ${ssh_master} kubectl delete ns ${ns}
-	# wait for namespace to be fully deleted (and allocated
-	# resources, such as volumes/loadbalancers to be released)
-	while ${ssh_master} kubectl get ns ${ns} > /dev/null; do
-	    log "waiting for namespace ${ns} to be deleted ..."
-	    sleep 10s
-	done
+        # wait for namespace to be fully deleted (and allocated
+        # resources, such as volumes/loadbalancers to be released)
+        while ${ssh_master} kubectl get ns ${ns} > /dev/null; do
+            log "waiting for namespace ${ns} to be deleted ..."
+            sleep 10s
+        done
     fi
 done
 
