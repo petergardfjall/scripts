@@ -59,6 +59,11 @@ dest_registry=${1}
 existing_repos=$(aws ecr describe-repositories | jq -r '.[][].repositoryName')
 echo "reading images for which to create repos from stdin ..."
 while read image_and_tags; do
+    if echo ${image_and_tags} | egrep -q '^\s*#' ; then
+        # ignore lines starting with #
+        continue
+    fi
+
     image=$(echo ${image_and_tags} | awk -F: '{ print $1 }')
     tags=$(echo ${image_and_tags} | awk -F: '{ print $2 }')
     if echo ${existing_repos} | grep --silent ${image}; then

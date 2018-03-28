@@ -59,7 +59,7 @@ function print_usage() {
     echo "  --help               Prints help text."
 }
 
-function die_with_msg() {
+function die_with_error() {
     log error "error: ${1}"
     exit 1
 }
@@ -75,7 +75,7 @@ for arg in ${@}; do
             exit 0
             ;;
         --*)
-            die_with_msg "unrecognized option: ${arg}"
+            die_with_error "unrecognized option: ${arg}"
             ;;
         *)
             # assume only positional args left
@@ -86,7 +86,7 @@ for arg in ${@}; do
 done
 
 if [[ $# -lt 2 ]]; then
-    die_with_msg "both a source registry and a destination registry must be given"
+    die_with_error "both a source registry and a destination registry must be given"
 fi
 source_registry=${1}
 dest_registry=${2}
@@ -94,7 +94,7 @@ dest_registry=${2}
 # try to find credentials for registry
 source_creds=$(cat ~/.docker/config.json | jq -r --arg reg ${source_registry} '.auths | with_entries(select(.key | contains($reg))) | .[].auth')
 if [ "${source_creds}" = "null" ]; then
-    die_with_msg "error: no credentials found for ${source_registry} in ~/.docker/config.json"
+    die_with_error "error: no credentials found for ${source_registry} in ~/.docker/config.json"
 fi
 # base64 decode credentials
 source_creds=$(echo ${source_creds} | base64 -d)
@@ -133,7 +133,7 @@ while read image_and_tags; do
         fi
 
         if [ -z ${local_created_at} ] && [ -z ${remote_created_at} ]; then
-            die_with_message "${qualified_image} neither found locally nor in ${source_registry}"
+            die_with_error "${qualified_image} neither found locally nor in ${source_registry}"
         fi
 
         if [ -n ${remote_created_at} ]; then
