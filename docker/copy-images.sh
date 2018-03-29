@@ -66,10 +66,6 @@ function die_with_error() {
 
 for arg in ${@}; do
     case ${arg} in
-        --loglevel=*)
-            log_level=${arg#*=}
-            exit 0
-            ;;
         --help)
             print_usage
             exit 0
