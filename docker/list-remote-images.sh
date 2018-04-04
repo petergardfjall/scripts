@@ -50,7 +50,7 @@ fi
 registry="${1}"
 
 # try to find credentials for registry
-source_creds=$(cat ~/.docker/config.json | jq -r --arg registry ${registry} '.auths | with_entries(select(.key | contains($registry))) | .[].auth')
+source_creds=$(cat ~/.docker/config.json | jq -r --arg registry ${registry} '.auths | with_entries(select(.key | contains($registry))) | .[].auth' | head -1)
 if [ "${source_creds}" = "null" ]; then
     die_with_msg "error: no credentials found for ${registry} in ~/.docker/config.json"
 fi
