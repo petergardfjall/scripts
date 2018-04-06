@@ -20,8 +20,8 @@ function print_usage() {
     echo "${scriptname} [OPTIONS] HOST ..."
     echo
     echo "Perform a full reset on a set of kubernetes nodes installed via"
-    echo "kubeadm. This includes running `kubeadm reset`, clearing iptables,"
-    echo "and removing any weave state files. Assumes that `kubectl` is "
+    echo "kubeadm. This includes running 'kubeadm reset', clearing iptables,"
+    echo "and removing any weave state files. Assumes that 'kubectl' is "
     echo "installed on the first host given."
     echo
     echo "OPTIONS:"
