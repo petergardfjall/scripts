@@ -10,7 +10,7 @@ function print_usage() {
     echo "Prints the TLS certificate of a remote host."
     echo
     echo "Options:"
-    echo "--port          The server TLS port. Default: ${port}."
+    echo "--port=PORT     The server TLS port. Default: ${port}."
     echo "--help          Show this help text."
     exit 1
 }
