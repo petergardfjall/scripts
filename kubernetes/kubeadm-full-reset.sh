@@ -120,5 +120,7 @@ EOF
     log "${node}: restart docker ..."
     ${ssh_node} sudo systemctl restart docker
     log "${node}: uninstall kubelet kubeadm ..."
+    ${ssh_node} sudo systemctl daemon-reload
+    ${ssh_node} sudo systemctl stop kubelet
     ${ssh_node} sudo apt-get purge -y kubelet kubeadm
 done
