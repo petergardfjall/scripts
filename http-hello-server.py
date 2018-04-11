@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 class HttpServer(socketserver.TCPServer):
     # prevent "Address already in use" error when restarting the server program
     # after a socket has been opened
-    allow_reuse_address = True
+    socketserver.TCPServer.allow_reuse_address = True
 
 def say_hello(self):
     self.send_response(HTTPStatus.OK)
