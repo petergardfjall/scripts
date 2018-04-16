@@ -64,7 +64,7 @@ log "ssh login key:  ${ssh_key}"
 
 master=${1}
 
-ssh_master="ssh -i ${ssh_key} ${ssh_user}@${master}"
+ssh_master="ssh -o StrictHostKeyChecking=no -i ${ssh_key} ${ssh_user}@${master}"
 
 log "getting k8s namespaces from master ${master} ..."
 namespaces=$(${ssh_master} kubectl get ns -o jsonpath='{.items[*].metadata.name}')
@@ -87,7 +87,7 @@ ${ssh_master} kubectl delete ds -n kube-system weave-net
 
 # clear each node
 for node in ${@}; do
-    ssh_node="ssh -i ${ssh_key} ${ssh_user}@${node}"
+    ssh_node="ssh -o StrictHostKeyChecking=no -i ${ssh_key} ${ssh_user}@${node}"
 
     log "clearing node ${node} ..."
     log "${node}: kubeadm reset ..."
