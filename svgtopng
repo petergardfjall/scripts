@@ -11,7 +11,7 @@ background="#FFFFFF"
 opacity="1.0"
 
 function print_usage() {
-    echo "${scriptname} [OPTIONS] <source.svg> <dest.png>"
+    echo "${scriptname} [OPTIONS] <source.svg> [<dest.png>]"
     echo ""
     echo "Options:"
     echo "--background=COLOR  Background color to set. Default: ${background}."
@@ -49,11 +49,15 @@ for arg in $@; do
     shift
 done
 
-[ "$#" -eq 2 ] || die "error: 2 argument(s) required, $# provided"
+if [ "${1}" =  "" ]; then
+    die "error: no <source.svg> file given"
+fi
+source_svg=${1}
 
-source_svg=$1
-dest_png=$2
-
+dest_png="$(echo ${source_svg} | sed 's/.svg//').png"
+if [ "${2}" != "" ]; then
+    dest_png=$2
+fi    
 [ "${source_svg}" = "${dest_png}" ] && die "error: source and destination are the same file"
 
 inkscape --export-use-hints --export-area-drawing --export-background=${background} --export-background-opacity=${opacity} --export-dpi=200 --export-png=${dest_png} ${source_svg}
