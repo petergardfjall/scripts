@@ -9,6 +9,8 @@ scriptname=$(basename ${0})
 
 background="#FFFFFF"
 opacity="1.0"
+height=
+width=
 
 function print_usage() {
     echo "${scriptname} [OPTIONS] <source.svg> [<dest.png>]"
@@ -16,6 +18,14 @@ function print_usage() {
     echo "Options:"
     echo "--background=COLOR  Background color to set. Default: ${background}."
     echo "--opacity=VALUE     Background opacity (0.0 - 1.0). Default: ${opacity}."
+    echo "--height=px         The height (in pixels) of the generated bitmap."
+    echo "                    For example, 1024. For correct scaling, only "
+    echo "                    specify one of --height and --width. Default: "
+    echo "                    use svg height."
+    echo "--width=px          The width (in pixels) of the generated bitmap."
+    echo "                    For example, 1024. For correct scaling, only "
+    echo "                    specify one of --height and --width. Default: "
+    echo "                    use svg width."
     echo "--help              Show help text"
 
 }
@@ -34,6 +44,12 @@ for arg in $@; do
 	    ;;
 	--opacity=*)
 	    opacity=${arg#*=}
+	    ;;
+	--height=*)
+	    height=${arg#*=}
+	    ;;
+	--width=*)
+	    width=${arg#*=}
 	    ;;
 	--help)
 	    print_usage
@@ -57,7 +73,16 @@ source_svg=${1}
 dest_png="$(echo ${source_svg} | sed 's/.svg//').png"
 if [ "${2}" != "" ]; then
     dest_png=$2
-fi    
+fi
 [ "${source_svg}" = "${dest_png}" ] && die "error: source and destination are the same file"
 
-inkscape --export-use-hints --export-area-drawing --export-background=${background} --export-background-opacity=${opacity} --export-dpi=200 --export-png=${dest_png} ${source_svg}
+options="--export-background=${background} --export-background-opacity=${opacity}"
+if [ -n "${height}" ]; then
+    options="${options} --export-height=${height}"
+fi
+if [ -n "${width}" ]; then
+    options="${options} --export-width=${width}"
+fi
+
+inkscape --export-use-hints --export-area-drawing --export-dpi=200 ${options} \
+	 --export-png=${dest_png} ${source_svg}
