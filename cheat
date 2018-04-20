@@ -22,7 +22,8 @@ class CheatSheet(object):
     def get(self, section=None, section_num=None):
         """Returns the contents of the cheat sheet. Either the contents
         of a specific section (if a section is given) or the entire
-        :class:`CheatSheet` if no section is given.
+        :class:`CheatSheet` if no section is given. A new section is denoted
+        by a line with a leading '##'.
 
         :keyword section: The section to get, or `None` to get the entire
           :class:`CheatSheet`.
@@ -47,7 +48,8 @@ class CheatSheet(object):
         return '\n'.join(self.sections[section_header])
         
     def list_sections(self):
-        """Returns all section headers of this cheat sheet."""
+        """Returns all section headers of this cheat sheet. A new section 
+        is denoted by a line with a leading '##'."""
         return self.sections.keys()
     
     def _parse(self, path):
@@ -66,8 +68,8 @@ class CheatSheet(object):
             section_lines = []
             for line in cheatsheet:
                 sections["/"].append(line.rstrip())
-                # new section encountered?
-                new_section = re.match(r'^(#+)(.*)$', line.strip())
+                # new section encountered (leading '##')?
+                new_section = re.match(r'^(##+)(.*)$', line.strip())
                 if new_section:
                     # prepare for new section
                     curr_section = new_section.group(2).strip()
@@ -140,14 +142,16 @@ if __name__ == "__main__":
         help="Only show a given section of the cheat sheet.")
     show_parser.add_argument(
         "-n", "--section-num", metavar="<NUM>", type=int, 
-        help="Only show a given section (specified by number) of the cheat sheet.")
+        help="Only show a given section (specified by number) of the cheat "
+        "sheet. A new section is denoted by a line with a leading '##'.")
     
     # function to invoke after parsing subcommand
     show_parser.set_defaults(handler=do_show)
 
     # toc sub-command
     toc_parser = subparsers.add_parser(
-        "toc", help="Lists cheat sheet sections for a command.")
+        "toc", help="Lists cheat sheet sections for a command. "
+        "A new section is denoted by a line with a leading '##'.")
     toc_parser.add_argument(
         "command", metavar="<COMMAND>", type=str, 
         help="The command for which to list all cheat sheet sections.")
