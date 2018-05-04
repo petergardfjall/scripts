@@ -6,7 +6,7 @@
 #
 
 default_network_interface=$(route | grep default | awk '{print $8}')
-ip=$(ifconfig ${default_network_interface} | grep 'inet addr' | awk '{print $2}' | awk -F : '{print $2}')
+ip=$(ifconfig ${default_network_interface} | grep 'inet ' | awk '{print $2}')
 echo "primary network interface IP: ${ip}"
 
 public_ip=$(dig +short myip.opendns.com @resolver1.opendns.com)
