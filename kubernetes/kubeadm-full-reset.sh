@@ -62,6 +62,11 @@ log "ssh login key:  ${ssh_key}"
 
 [ -z ${1} ] && die_with_error "no HOST(s) given"
 
+for host in ${@}; do
+    log "clear from known hosts:  ${ssh_key}"
+    ssh-keygen -f ~/.ssh/known_hosts -R ${host}
+done
+
 master=${1}
 
 ssh_master="ssh -o StrictHostKeyChecking=no -i ${ssh_key} ${ssh_user}@${master}"
