@@ -96,7 +96,7 @@ for node in ${@}; do
 
     log "clearing node ${node} ..."
     log "${node}: kubeadm reset ..."
-    ${ssh_node} sudo kubeadm reset
+    ${ssh_node} sudo kubeadm reset --force
     cat > /tmp/reset-weave.sh <<EOF
 sudo curl -fsSL git.io/weave -o /usr/local/bin/weave
 sudo chmod +x /usr/local/bin/weave
@@ -127,5 +127,5 @@ EOF
     log "${node}: uninstall kubelet kubeadm ..."
     ${ssh_node} sudo systemctl daemon-reload
     ${ssh_node} sudo systemctl stop kubelet
-    ${ssh_node} sudo apt-get purge -y kubelet kubeadm
+    ${ssh_node} sudo apt-get purge -y --allow-change-held-packages kubelet kubeadm
 done
