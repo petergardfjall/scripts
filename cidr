@@ -91,8 +91,13 @@ def get_subnet(args):
     network = parse_cidr_or_die(args.network)
     subnet_size = args.size
     subnet_index = args.index
-    subnet = list(network.subnets(new_prefix=subnet_size))[subnet_index]
-    print(subnet)
+    subnet_list = list(network.subnets(new_prefix=subnet_size))
+    try:
+        subnet = subnet_list[subnet_index]
+        print(subnet)
+    except IndexError:
+        print("error: subnet index is out of range, only {} subnet(s) exist of the given size (/{})".format(len(subnet_list), subnet_size))
+        sys.exit(1)
 
 
 if __name__ == "__main__":
