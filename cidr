@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+
+import argparse
+import ipaddress
+import sys
+
+def parse_cidr_or_die(network_cidr):
+    """Parses a network CIDR string and returns a `IPv4Network` instance.
+    On error, an error message is written and the program terminates with
+    non-zero exit code.
+    """
+    try:
+        return ipaddress.ip_network(network_cidr)
+    except Exception as e:
+        print('invalid network CIDR range "{}": {}'.format(
+            network_cidr, str(e)))
+        sys.exit(1)
+
+
+def is_valid(args):
+    """Implementation of the `is-valid` subcommand. Validates that the
+    given network CIDR address is syntactically correct. Expects
+    `args.network` to be set."""
+    parse_cidr_or_die(args.network)
+
+
+def is_subset(args):
+    """Implementation of the `is-subset` subcommand. Validates that a
+    given (sub)network CIDR is a subset of a given (super)network.
+    Expects `args.subnet` and `args.supernet` to be set."""
+    subnet = parse_cidr_or_die(args.subnet)
+    subnet_ips = list(subnet.hosts())
+
+    supernet = parse_cidr_or_die(args.supernet)
+    supernet_ips = list(supernet.hosts())
+
+    subnet_first_ip = subnet_ips[0]
+    subnet_last_ip = subnet_ips[-1]
+
+    # subnet is a subset of supernet if all IP addresses lie within supernet
+    if ((not subnet_first_ip in supernet_ips) or
+        (not subnet_last_ip in supernet_ips)):
+        print('error: "{}" is not a subset of "{}"'.format(
+            args.subnet, args.supernet))
+        print('  supernet range: {} - {}'.format(supernet_ips[0], supernet_ips[-1]))
+        print('  subnet range:   {} - {}'.format(subnet_first_ip, subnet_last_ip))
+        sys.exit(1)
+
+
+def is_nonoverlapping(args):
+    """Implementation of the `is-nonoverlapping` subcommand. Validates that a
+    given collection of networks are non-overlapping. Should any two networks
+    overlap, an error is printed and the program exits with a non-zero exit
+    code. Expects a list of networks in `args.networks`."""
+    networks = [ parse_cidr_or_die(n) for n in args.networks ]
+    # compare each network with all other networks and fail if any two
+    # networks overlap.
+    for i, network in enumerate(networks):
+        for j, other in enumerate(networks):
+            if i == j:
+                # don't compare network with itself
+                continue
+            if network.overlaps(other):
+                print('error: network "{}" overlaps with "{}"'.format(
+                    network, other))
+                sys.exit(1)
+
+
+def first_ip(args):
+    """Implementation of the `first-ip` subcommand. Expects a network CIDR
+    address range in `args.network`."""
+    network = parse_cidr_or_die(args.network)
+    network_ips = list(network.hosts())
+    print(network_ips[0])
+
+
+def last_ip(args):
+    """Implementation of the `last-ip` subcommand. Expects a network CIDR
+    address range in `args.network`."""
+    network = parse_cidr_or_die(args.network)
+    network_ips = list(network.hosts())
+    print(network_ips[-1])
+
+
+def get_subnet(args):
+    """Implementation of the `get-subnet` subcommand. From a given network
+    CIDR (`args.network`), generate a subnet with a given size in bits
+    (`args.size`) and index (`args.index`). For example, given a network of
+    '10.1.0.0/16', a size of '24', and an index of 21 the subnet
+    '10.1.21.0/24' would be output."""
+    network = parse_cidr_or_die(args.network)
+    subnet_size = args.size
+    subnet_index = args.index
+    subnet = list(network.subnets(new_prefix=subnet_size))[subnet_index]
+    print(subnet)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="ipv4net",
+        description="")
+
+    subparsers = parser.add_subparsers(help="subcommands")
+
+    is_valid_parser = subparsers.add_parser(
+        "is-valid", help="Checks that a given network address range is correctly formatted as a CIDR range. If the network is syntactically incorrect the program exits with a non-zero exit code.")
+    is_valid_parser.add_argument(
+        "network", metavar="<NETWORK-CIDR>", help="A CIDR-formatted address range such as '172.29.254.0/24'.")
+    is_valid_parser.set_defaults(action=is_valid)
+
+    is_subset_parser = subparsers.add_parser(
+        "is-subset", help="Checks that a given (sub)network is a subnet (a subset of the address space) of a given parent network. If the subnet is not a subset of the parent network address space, the program exits with a non-zero exit code.")
+    is_subset_parser.add_argument(
+        "supernet", metavar="<SUPERNET-CIDR>", help="A CIDR-formatted parent network. For example, '172.29.254.0/24'.")
+    is_subset_parser.add_argument(
+        "subnet", metavar="<SUBNET-CIDR>", help="A CIDR-formatted (sub)network that will be checked for inclusion in the parent network. For example, '172.29.254.16/28'.")
+    is_subset_parser.set_defaults(action=is_subset)
+
+    is_nonoverlapping_parser = subparsers.add_parser(
+        "is-nonoverlapping", help="Checks that a given set of networks are non-overlapping in their address ranges. If any networks overlap, the program exits with non-zero exit code.")
+    is_nonoverlapping_parser.add_argument(
+        "networks", nargs="+", metavar="<NETWORK-CIDR>", help="A list of CIDR-formatted networks. For example, '172.29.254.16/28'.")
+    is_nonoverlapping_parser.set_defaults(action=is_nonoverlapping)
+
+    first_ip_parser = subparsers.add_parser(
+        "first-ip", help="Displays the first IP address in a CIDR range.")
+    first_ip_parser.add_argument(
+        "network", metavar="<NETWORK-CIDR>", help="A CIDR-formatted network. For example, '172.29.254.16/28'.")
+    first_ip_parser.set_defaults(action=first_ip)
+
+    last_ip_parser = subparsers.add_parser(
+        "last-ip", help="Displays the last IP address in a CIDR range.")
+    last_ip_parser.add_argument(
+        "network", metavar="<NETWORK-CIDR>", help="A CIDR-formatted network. For example, '172.29.254.16/28'.")
+    last_ip_parser.set_defaults(action=last_ip)
+
+    get_subnet_parser = subparsers.add_parser(
+        "get-subnet", help="From a given network CIDR, generate a subnet with a given size (in bits) and index. For example, given a network of '10.1.0.0/16', a size of '24', and an index of 21 the subnet '10.1.21.0/24' would be output.")
+    get_subnet_parser.add_argument(
+        "network", metavar="<NETWORK-CIDR>", help="A CIDR-formatted network. For example, '10.1.0.0/16'.")
+    get_subnet_parser.add_argument(
+        "size", type=int, metavar="<BITS>", help="A subnet size in bits. For example, '24'.")
+    get_subnet_parser.add_argument(
+        "index", type=int, metavar="<INDEX>", help="The index of the subnet among the list of subnets of the given size that can be created from the parent network. For example, '2'.")
+    get_subnet_parser.set_defaults(action=get_subnet)
+
+    args = parser.parse_args()
+
+    if not hasattr(args, "action"):
+        print("please specify a subcommand (--help for usage)")
+        sys.exit(1)
+
+    args.action(args)
