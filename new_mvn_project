@@ -9,4 +9,4 @@ fi
 group_id=${1}
 artifact_id=${2}
 
-mvn archetype:generate -DgroupId=${group_id} -DartifactId=${artifact_id} -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+mvn archetype:generate -DgroupId=${group_id} -DartifactId=${artifact_id} -DarchetypeGroupId=com.thepracticaldeveloper -DarchetypeArtifactId=archetype-java-basic-tpd -DarchetypeVersion=1.0.0
