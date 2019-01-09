@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import collections
+import io
 import itertools
 import logging
 import os
@@ -12,77 +13,403 @@ DEFAULT_CHEAT_SHEET_PATH = "~/dotfiles/cheat/sheets"
 DEFAULT_CHEAT_SHEET_DIR = os.path.expanduser(DEFAULT_CHEAT_SHEET_PATH)
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)5s] %(message)s")
-log = logging.getLogger(__name__)
+    level=logging.INFO, format="%(asctime)s [%(levelname)5s] %(message)s",
+    stream=sys.stdout)
+LOG = logging.getLogger(__name__)
+if "LOG_LEVEL" in os.environ:
+    LOG.setLevel(os.environ["LOG_LEVEL"])
+
+class Type:
+    """The Type of parseable tokens in a cheat sheet."""
+    DOC       = "DOC"
+    """A document token is a block token for the 0-indent level with
+    the content as a sequence of child tokens."""
+    LISTITEM  = "LISTITEM"
+    """A list token is a block token that starts with a '- ', '* ' or, '+ '
+    marker at the current block's indent level."""
+    HEADER    = "HEADER"
+    """A header token is at indent-level 0 with one or more leading '#' """
+    CODE      = "CODE"
+    """A code token is any text indented relative to its parent block."""
+    TEXT      = "TEXT"
+    """A text token is any unindented text (relative to the parent block)
+    that does not start with a list marker."""
+
+
+class Token:
+    """A Token is a parseable entity in the parse tree and can either
+    contain text or be a block token (with a sequence of child tokens)."""
+    def __init__(self, type, indent, text=None, children=None):
+        """Create a Token.
+        :param type: The type of token. One of
+           `Type.{DOC,LISTITEM,HEADER,CODE,TEXT}`
+        :param indent: The number of leading spaces.
+        :param text: The text content of the token. Only relevant for
+          non-block/leaf tokens (`HEADER`, `CODE`, `TEXT`).
+        :param children: A list of child tokens for a block token
+          (`DOC`, `LISTITEM`).
+        """
+        self.type = type
+        self.indent = indent
+        self.text = text
+        self.children = children if children else []
+
+    def debug(self, level=0):
+        indent = lambda level: "  " * (level)
+
+        buf = io.StringIO()
+
+        buf.write("{}Token(type={}, indent={}, text='{}'".format(
+                indent(level), self.type, self.indent, self.text))
+        if self.children:
+            buf.write(", children=[\n")
+            for child in self.children:
+                buf.write(child.debug(level + 1))
+            buf.write("{}])\n".format(indent(level)))
+        else:
+            buf.write(")\n")
+
+
+        return buf.getvalue()
+
+    def __str__(self):
+        if self.text:
+            return self.text
+        buf = io.StringIO()
+        for child in self.children:
+            buf.write(str(child) + "\n")
+        return buf.getvalue()
+
+
+class TokenStack:
+    def __init__(self):
+        self.stack = []
+
+    def push(self, token):
+        self.stack.append(token)
+
+    def pop(self):
+        return self.stack.pop()
+
+    def top(self):
+        return self.stack[-1]
+
+
+class ParseContext:
+    """."""
+    def __init__(self, fileobj, token_stack):
+        """Create a new ParseContext and set cursor to first line."""
+        self._lineno = 0
+        self._fileobj = fileobj
+        self.next()
+        self._token_stack = token_stack
+
+    def next(self):
+        """Move cursor to next line."""
+        self._line = self._fileobj.readline()
+        if self._line:
+            # note: always strip trailing whitespace
+           self._line= self._line.rstrip()
+           LOG.debug("next(): '%s'", self._line)
+           self._lineno += 1
+        else:
+            self._line = None
+        return self._line
+
+    def line(self):
+        """Return the line at which the cursor is currently at."""
+        return self._line
+
+    def lineno(self):
+        """Return the line number at which the cursor is currently at."""
+        return self._lineno
+
+    def eof(self):
+        """Return True if EOF has been reached."""
+        return self.line() is None
+
+    def indent(self):
+        """Number of leading whitespace characters on the current cline."""
+        if self.line is None:
+            raise RuntimeError("EOF reached")
+        return len(self.line()) - len(self.line().lstrip())
+
+    def token_stack(self):
+        return self._token_stack
+
+
+class Header:
+    """Header token parser."""
+
+    PATTERN = re.compile(r'^\s*#+.*$')
+
+    def matches(ctx):
+        return ctx.indent() == 0 and Header.PATTERN.match(ctx.line())
+
+    def parse(ctx):
+        LOG.debug("Header.parse: '%s'", ctx.line())
+        header_text = ctx.line().strip(" #")
+        ctx.next()
+        return Token(Type.HEADER, 0, text=header_text)
+
+class Code:
+    """Code token parser."""
+
+    def matches(ctx):
+        return ctx.indent() > ctx.token_stack().top().indent
+
+    def parse(ctx):
+        LOG.debug("Code.parse: '%s'", ctx.line())
+        code_indent = ctx.indent()
+        token = Token(Type.CODE, code_indent, text=ctx.line().strip())
+        ctx.next()
+        return token
+
+class Text:
+    """Text token parser."""
+
+    def matches(ctx):
+        return ctx.indent() == ctx.token_stack().top().indent
+
+    def parse(ctx):
+        LOG.debug("Text.parse: '%s'", ctx.line())
+        text_indent = ctx.indent()
+        token = Token(Type.TEXT, text_indent, text=ctx.line().strip())
+        ctx.next()
+        return token
+
+class ListItem:
+    """ListItem token parser."""
+
+    PATTERN = re.compile(r'^(\s*([\-]|[0-9]+\.)\s*)(.*)$')
+
+    def matches(ctx):
+        parent = ctx.token_stack().top()
+        return ctx.indent() == parent.indent and ListItem.PATTERN.match(ctx.line())
+
+    def parse(ctx):
+        LOG.debug("ListItem.parse: '%s'", ctx.line())
+        bullet = ListItem.PATTERN.match(ctx.line()).group(1)
+        text = ListItem.PATTERN.match(ctx.line()).group(3)
+        indent = len(bullet)
+        list_token = Token(Type.LISTITEM, indent, text=bullet)
+
+        # replace bullet marker with whitespace (to make first ListItem line
+        # parse as text
+        bullet = indent * ' '
+        # if a bullet starts with multiple -- make sure those are stripped
+        # to not interpret text as a new listitem
+        text = text.lstrip("-")
+
+        ctx._line = bullet + text
+        return Block.parse(ctx, list_token)
+
+
+class Block:
+    """Block parser."""
+
+    def parse(ctx, block_token):
+        """Parses a block-type token (either DOC/LISTITEM) at a given
+        indent-level."""
+        indent = block_token.indent
+        LOG.debug("block{indent=%d}: starting at: '%s'", indent, ctx.line())
+
+        block = block_token
+        ctx.token_stack().push(block)
+
+        # parse
+        while not ctx.eof():
+            if not ctx.line().strip():
+                block.children.append(Token(Type.TEXT, indent, ""))
+                ctx.next()
+                continue
+
+            LOG.debug("block{indent=%d}: parsing: '%s'", indent, ctx.line())
+            # headers can only occur on zero-indent level
+            if Header.matches(ctx) and indent == 0:
+                block.children.append(Header.parse(ctx))
+            elif ListItem.matches(ctx):
+                block.children.append(ListItem.parse(ctx))
+            elif Text.matches(ctx):
+                block.children.append(Text.parse(ctx))
+            elif Code.matches(ctx):
+                block.children.append(Code.parse(ctx))
+            else:
+                # nothing matched, assume block ended
+                break
+
+        ctx.token_stack().pop()
+        return block
+
+
+class Renderer:
+    """A renderer renders a token parse tree to a given stream (for example,
+    `sys.stdout`)."""
+
+    def __init__(self, token_tree_root, stream):
+        self.token_tree_root = token_tree_root
+        self.stream = stream
+        self._reset_style()
+
+    def render(self):
+        for child in self.token_tree_root.children:
+            self._render_token(child)
+        self.stream.flush()
+
+    def _toggle_bold(self):
+        self._set_bold(not self._bold)
+
+    def _set_bold(self, enabled):
+        self._bold = enabled
+        if self._bold:
+            self.stream.write("\033[1m")
+        else:
+            # disables bold and dim
+            self.stream.write("\033[22m")
+
+    def _toggle_underlined(self):
+        self._set_underlined(not self._underlined)
+
+    def _set_underlined(self, enabled):
+        self._underlined = enabled
+        if self._underlined:
+            self.stream.write("\033[4m")
+        else:
+            self.stream.write("\033[24m")
+
+    def _toggle_verbatim(self):
+        self._set_verbatim(not self._verbatim)
+
+    def _set_verbatim(self, enabled):
+        self._verbatim = enabled
+        if self._verbatim:
+            self.stream.write("\033[92m")
+        else:
+            self.stream.write("\033[39m")
+
+    def _reset_style(self):
+        self._underlined = False
+        self._bold = False
+        self._verbatim = False
+        self.stream.write("\033[0m")
+
+    def _render_text(self, text):
+        self._reset_style()
+        for i, char in enumerate(text):
+            if self._verbatim and char != '`':
+                # in verbatim mode (between tics ``) => write all chars as-is
+                # except ending `
+                self.stream.write(char)
+            elif char == '`':
+                self._toggle_verbatim()
+            elif char == '_':
+                self._toggle_underlined()
+            elif char == '*':
+                self._toggle_bold()
+            else:
+                self.stream.write(char)
+
+    def _render_token(self, token):
+        if token.type == Type.HEADER:
+            self._toggle_bold()
+            self._toggle_underlined()
+            self.stream.write(token.text)
+            self._reset_style()
+            self.stream.write("\n")
+            pass
+        elif token.type == Type.TEXT:
+            self._reset_style()
+            self.stream.write(" " * token.indent)
+            self._render_text(token.text + "\n")
+        elif token.type == Type.CODE:
+            self.stream.write(" " * token.indent)
+            self._toggle_verbatim()
+            self.stream.write(token.text)
+            self._reset_style()
+            self.stream.write("\n")
+        elif token.type == Type.LISTITEM:
+            bullet = token.text
+            self.stream.write(" " * (token.indent - len(bullet)) + bullet)
+            self._render_text(token.children[0].text + "\n")
+            for child in token.children[1:]:
+                self._render_token(child)
+        else:
+            raise ValueError("unrecognized token type: {}".format(
+                token.type))
+
+
+class CheatSheetParser:
+
+    def __init__(self, fileobj):
+        self.f = fileobj
+
+    def parse(self):
+        ctx = ParseContext(self.f, TokenStack())
+
+        return Block.parse(ctx, Token(Type.DOC, 0))
+
 
 class CheatSheet(object):
     def __init__(self, path):
-        self.sections = self._parse(path)
+        self._doc = self._parse(path)
 
-    def get(self, section=None, section_num=None):
-        """Returns the contents of the cheat sheet. Either the contents
+    def get(self, section_num=None):
+        """Returns the contents of a cheat sheet. Either the contents
         of a specific section (if a section is given) or the entire
         :class:`CheatSheet` if no section is given. A new section is denoted
         by a line with a leading '##'.
 
-        :keyword section: The section to get, or `None` to get the entire
-          :class:`CheatSheet`.
-        :type section: str
-        :keyword section_num: The index of the section to get, or `None`.
+        :keyword section_num: The index of the section to get,
+          or `None` to get the entire :class:`CheatSheet`.
         :type section_num: int
 
         :rtype: str
         """
-        if not section and section_num is None:
+        if section_num is None:
             # print the root section
-            return self._content("/")
+            buf = io.StringIO()
+            Renderer(self._doc, buf).render()
+            return buf.getvalue()
 
-        if section:
-            return self._content(self.sections[section])
-        else:
-            section_header = self.sections.keys()[section_num]
-            return self._content(section_header)
-                
+        if section_num < 0 or section_num >= len(self.list_sections()):
+            raise ValueError("section index out of bounds")
+        # find section and print contents until next section/EOF
+        curr_section = -1
+        subdoc = Token(Type.DOC, indent=0)
+        for tok in self._doc.children:
+            if tok.type == Type.HEADER:
+                curr_section += 1
+                LOG.debug("new section: %d: %s", curr_section, tok)
+            if curr_section == section_num:
+                LOG.debug("appending: %s", tok.type)
+                subdoc.children.append(tok)
 
-    def _content(self, section_header):
-        return '\n'.join(self.sections[section_header])
-        
+        buf = io.StringIO()
+        Renderer(subdoc, buf).render()
+        return buf.getvalue()
+
+
     def list_sections(self):
-        """Returns all section headers of this cheat sheet. A new section 
+        """Returns all section headers of this cheat sheet. A new section
         is denoted by a line with a leading '##'."""
-        return self.sections.keys()
-    
+        return [tok for tok in self._doc.children if tok.type == Type.HEADER]
+
     def _parse(self, path):
         """Parses a `.cheat` file.
-        
-        :return: A dictionary with section headers as keys and the content
-          of each section as values (list of lines).
+
+        :return: A cheat sheet parse tree with a root token of type `DOC`.
         :rtype: dict of list of str
         """
-        sections = collections.OrderedDict()
-        with open(path) as cheatsheet:
-            # root section contains entire document
-            sections["/"] = []
-            # collects lines in the current section being processed
-            curr_section = None
-            section_lines = []
-            for line in cheatsheet:
-                sections["/"].append(line.rstrip())
-                # new section encountered (leading '##')?
-                new_section = re.match(r'^(##+)(.*)$', line.strip())
-                if new_section:
-                    # prepare for new section
-                    curr_section = new_section.group(2).strip()
-                    sections[curr_section] = [line.strip()]
-                else:
-                    if curr_section:
-                        sections[curr_section].append(line.strip())
-        return sections
+        with open(path, "r", encoding="utf-8") as f:
+            parser = CheatSheetParser(f)
+            doc_token = parser.parse()
+        LOG.debug("parse tree:\n%s", doc_token.debug(0))
+        return doc_token
 
-    
-        
+
+
 def do_show(args):
-    log.debug("show: %s", args)
+    LOG.debug("show: %s", args)
     sheet_path = os.path.join(args.sheet_dir, args.command + ".cheat")
     if not os.path.isfile(sheet_path):
         print("error: no cheat sheet for command '%s' exists at '%s'" %
@@ -90,11 +417,11 @@ def do_show(args):
         sys.exit(1)
 
     cheatsheet = CheatSheet(sheet_path)
-    print(cheatsheet.get(section=args.section, section_num=args.section_num))
+    print(cheatsheet.get(args.section_num))
 
 
 def do_list(args):
-    log.debug("list: %s", args)
+    LOG.debug("list: %s", args)
     files = sorted(os.listdir(args.sheet_dir))
     commands = [os.path.splitext(f)[0] for f in files if f.endswith(".cheat")]
     if commands:
@@ -102,7 +429,7 @@ def do_list(args):
 
 
 def do_toc(args):
-    log.debug("toc: %s", args)
+    LOG.debug("toc: %s", args)
     sheet_path = os.path.join(args.sheet_dir, args.command + ".cheat")
     if not os.path.isfile(sheet_path):
         print("error: no cheat sheet for command '%s' exists at '%s'" %
@@ -112,39 +439,58 @@ def do_toc(args):
     cheatsheet = CheatSheet(sheet_path)
     for index, section in enumerate(cheatsheet.list_sections()):
         print("[%d] %s" % (index, section))
-    
-        
-    
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Prints cheat sheets for different commands/programs.")
+        prog="cheat", formatter_class=argparse.RawTextHelpFormatter,
+        description="""Prints cheat sheets for different commands/programs.
+Cheat sheets follow a markdown-like syntax:
+
+## Header
+A paragraph with _emphasized_ words, `verbatim` and _underlined_ text.
+
+    a := 1.0; // indented text in a paragraph or list displays as code 
+        
+- Listitem 1
+- Listitem 2
+  - Sublist
+
+1. bullet list
+2. bullet list
+
+"""
+        
+    )
     parser.add_argument("--sheet-dir", metavar="<DIR>", type=str,
                         default=DEFAULT_CHEAT_SHEET_DIR,
                         help=("The directory where all cheat sheets "
                               "are stored. Default: %s." %
                               DEFAULT_CHEAT_SHEET_PATH))
-    
+
+
     subparsers = parser.add_subparsers()
+    subparsers.dest = "command"
+    subparsers.required=True
     # list sub-command
     list_parser = subparsers.add_parser(
         "list", help="List available cheat sheets.")
     # function to invoke after parsing subcommand
     list_parser.set_defaults(handler=do_list)
-    
+
     # show sub-command
     show_parser = subparsers.add_parser(
         "show", help="Show a particular cheat sheet.")
     show_parser.add_argument(
-        "command", metavar="<COMMAND>", type=str, 
+        "command", metavar="<COMMAND>", type=str,
         help="The command for which to show a cheat sheet.")
     show_parser.add_argument(
-        "-s", "--section", metavar="<SECTION>", type=str, 
-        help="Only show a given section of the cheat sheet.")
-    show_parser.add_argument(
-        "-n", "--section-num", metavar="<NUM>", type=int, 
+        "-s", "--section-num", metavar="<NUM>", type=int,
         help="Only show a given section (specified by number) of the cheat "
-        "sheet. A new section is denoted by a line with a leading '##'.")
-    
+        "sheet. A new section is denoted by a line with one or more leading "
+        "'#'.")
+
     # function to invoke after parsing subcommand
     show_parser.set_defaults(handler=do_show)
 
@@ -153,11 +499,11 @@ if __name__ == "__main__":
         "toc", help="Lists cheat sheet sections for a command. "
         "A new section is denoted by a line with a leading '##'.")
     toc_parser.add_argument(
-        "command", metavar="<COMMAND>", type=str, 
+        "command", metavar="<COMMAND>", type=str,
         help="The command for which to list all cheat sheet sections.")
     # function to invoke after parsing subcommand
     toc_parser.set_defaults(handler=do_toc)
-    
+
     args = parser.parse_args()
 
     # validate sheet directory
@@ -168,6 +514,5 @@ if __name__ == "__main__":
         raise RuntimeError(
             "The specified cheat sheet directory '%s' is not a directory" %
             args.sheet_dir)
-        
-    args.handler(args)
 
+    args.handler(args)
