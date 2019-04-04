@@ -11,6 +11,7 @@ import sys
 
 DEFAULT_CHEAT_SHEET_PATH = "~/dotfiles/cheat/sheets"
 DEFAULT_CHEAT_SHEET_DIR = os.path.expanduser(DEFAULT_CHEAT_SHEET_PATH)
+CHEAT_FILE_EXT = ".cheat.md"
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)5s] %(message)s",
@@ -395,7 +396,7 @@ class CheatSheet(object):
         return [tok for tok in self._doc.children if tok.type == Type.HEADER]
 
     def _parse(self, path):
-        """Parses a `.cheat` file.
+        """Parses a cheat file.
 
         :return: A cheat sheet parse tree with a root token of type `DOC`.
         :rtype: dict of list of str
@@ -410,7 +411,7 @@ class CheatSheet(object):
 
 def do_show(args):
     LOG.debug("show: %s", args)
-    sheet_path = os.path.join(args.sheet_dir, args.command + ".cheat")
+    sheet_path = os.path.join(args.sheet_dir, args.command + CHEAT_FILE_EXT)
     if not os.path.isfile(sheet_path):
         print("error: no cheat sheet for command '%s' exists at '%s'" %
               (args.command, sheet_path))
@@ -423,14 +424,14 @@ def do_show(args):
 def do_list(args):
     LOG.debug("list: %s", args)
     files = sorted(os.listdir(args.sheet_dir))
-    commands = [os.path.splitext(f)[0] for f in files if f.endswith(".cheat")]
+    commands = [os.path.splitext(f)[0] for f in files if f.endswith(CHEAT_FILE_EXT)]
     if commands:
         print("\n".join(commands))
 
 
 def do_toc(args):
     LOG.debug("toc: %s", args)
-    sheet_path = os.path.join(args.sheet_dir, args.command + ".cheat")
+    sheet_path = os.path.join(args.sheet_dir, args.command + CHEAT_FILE_EXT)
     if not os.path.isfile(sheet_path):
         print("error: no cheat sheet for command '%s' exists at '%s'" %
               (args.command, sheet_path))
@@ -451,8 +452,8 @@ Cheat sheets follow a markdown-like syntax:
 ## Header
 A paragraph with _emphasized_ words, `verbatim` and _underlined_ text.
 
-    a := 1.0; // indented text in a paragraph or list displays as code 
-        
+    a := 1.0; // indented text in a paragraph or list displays as code
+
 - Listitem 1
 - Listitem 2
   - Sublist
@@ -461,7 +462,7 @@ A paragraph with _emphasized_ words, `verbatim` and _underlined_ text.
 2. bullet list
 
 """
-        
+
     )
     parser.add_argument("--sheet-dir", metavar="<DIR>", type=str,
                         default=DEFAULT_CHEAT_SHEET_DIR,
