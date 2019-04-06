@@ -54,6 +54,8 @@ class Token:
         self.indent = indent
         self.text = text
         self.children = children if children else []
+        # attr can be used to decorate with token-specific metadata
+        self.attr = {}
 
     def debug(self, level=0):
         indent = lambda level: "  " * (level)
@@ -142,7 +144,7 @@ class ParseContext:
 class Header:
     """Header token parser."""
 
-    PATTERN = re.compile(r'^\s*#+.*$')
+    PATTERN = re.compile(r'^\s*(#+).*$')
 
     def matches(ctx):
         return ctx.indent() == 0 and Header.PATTERN.match(ctx.line())
@@ -150,8 +152,12 @@ class Header:
     def parse(ctx):
         LOG.debug("Header.parse: '%s'", ctx.line())
         header_text = ctx.line().strip(" #")
+        header_level = len(Header.PATTERN.match(ctx.line()).group(1))
         ctx.next()
-        return Token(Type.HEADER, 0, text=header_text)
+        tok = Token(Type.HEADER, 0, text=header_text)
+        # set the header level as an attribute (the number of leading '#')
+        tok.attr["header_level"] = header_level
+        return tok
 
 class Code:
     """Code token parser."""
@@ -438,9 +444,15 @@ def do_toc(args):
         sys.exit(1)
 
     cheatsheet = CheatSheet(sheet_path)
-    for index, section in enumerate(cheatsheet.list_sections()):
-        print("[%d] %s" % (index, section))
-
+    sections = cheatsheet.list_sections()
+    # header numbering column is as wide as the #digits in highest index
+    hnum_col_width = len(str(len(sections) - 1))
+    for index, section in enumerate(sections):
+        # format: [#index] <header-level indent><header>
+        fmt = "[{:>" + str(hnum_col_width) + "d}] {}"
+        indent = " " * 2 * (section.attr["header_level"] - 1)
+        heading = indent + section.text
+        print(fmt.format(index, heading))
 
 
 if __name__ == "__main__":
