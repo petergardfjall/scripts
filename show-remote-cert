@@ -5,43 +5,48 @@ scriptname=$(basename ${0})
 port=443
 
 function print_usage() {
-    echo "${scriptname} [OPTIONS] <hostname/IP>"
+    echo "${scriptname} [OPTIONS] <hostname/IP>:<port>"
     echo
     echo "Prints the TLS certificate of a remote host."
     echo
     echo "Options:"
-    echo "--port=PORT     The server TLS port. Default: ${port}."
     echo "--help          Show this help text."
     exit 1
 }
 
 for arg in ${@}; do
     case ${arg} in
-	--port=*)
-	    port=${arg/*=/}
-	    ;;
-	--help)
-	    print_usage
-	    ;;
-	--*)
-	    echo "error: unrecognized option: ${arg}"
-	    print_usage
-	    ;;
-	*)
-	    # assume only positional arguments left
-	    break
-	    ;;
+        --help)
+            print_usage
+            ;;
+        --*)
+            echo "error: unrecognized option: ${arg}"
+            print_usage
+            ;;
+        *)
+            # assume only positional arguments left
+            break
+            ;;
     esac
     shift
 done
 
-[ "${1}" = "" ] && echo "error: no <hostname/IP> argument given" && print_usage
-host=${1}
+[ "${1}" = "" ] && echo "error: no <hostname>:<port> argument given" && print_usage
 
-echo | openssl s_client -showcerts -connect ${host}:${port} | \
+# strip leading protocol
+host_port=${1}
+host_port="${host_port#http://}"
+host_port="${host_port#https://}"
+# strip any path
+host_port="$(echo ${host_port} | sed 's/\/.*//')"
+if ! echo ${host_port} | grep ':'; then
+    host_port="${host_port}:443"
+fi
+
+echo | openssl s_client -showcerts -connect ${host_port} 2> /dev/null | \
     openssl x509 -inform pem -noout -text
 
 if [ "${?}" != "0" ]; then
     echo
-    echo "error: could not retrieve TLS cert from '${host}:${port}'"
+    echo "error: could not retrieve TLS cert from '${host_port}'"
 fi
