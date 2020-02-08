@@ -8,8 +8,8 @@ import cgi
 import json
 import logging
 import optparse
-import SimpleHTTPServer
-import SocketServer
+from http.server import SimpleHTTPRequestHandler
+import socketserver
 import sys
 
 DEFAULT_LOGFILE="httpd.log"
@@ -18,19 +18,19 @@ log = logging.getLogger()
 
 request_count = 0
 
-class HttpServer(SocketServer.TCPServer):
+class HttpServer(socketserver.TCPServer):
     # prevent "Address already in use" error when restarting the server program
     # after a socket has been opened
     allow_reuse_address = True
 
-class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class ServerHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         global request_count
-        request_count += 1 
+        request_count += 1
         log.info("received request %d", request_count)
         log.info(self.headers)
-        SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+        SimpleHTTPRequestHandler.do_GET(self)
 
     def do_POST(self):
         global request_count
@@ -38,13 +38,13 @@ class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         log.info("received request %d", request_count)
         log.info(self.headers)
         self.log_request()
-        content_len = int(self.headers.getheader('content-length'))
+        content_len = int(self.headers.get('content-length'))
         post_body = self.rfile.read(content_len)
         # prettify output if we know it is of type json type
-        if self.headers.getheader('content-type') == "application/json":
+        if self.headers.get('content-type') == "application/json":
             post_body = json.dumps(json.loads(post_body), indent=2)
-        log.info("\n" + post_body)
-        SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+        log.info("\n%s", post_body)
+        SimpleHTTPRequestHandler.do_GET(self)
 
 
 if __name__ == "__main__":
@@ -61,7 +61,7 @@ if __name__ == "__main__":
                       help="The file where log output is written."
                       " Default: %s" % DEFAULT_LOGFILE,
                       metavar="FILE", default=DEFAULT_LOGFILE,
-                      type=str)    
+                      type=str)
     (options, args) = parser.parse_args()
     # set up logging to file
     logfile_handler = logging.FileHandler(options.logfile, mode="w")
@@ -69,18 +69,16 @@ if __name__ == "__main__":
     logfile_handler.setFormatter(
         logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
     log.addHandler(logfile_handler)
-    
-    # start http server   
+
+    # start http server
     Handler = ServerHandler
     httpd = HttpServer(("", options.port), Handler)
     log.debug("Listening on port %d" % options.port)
     try:
         httpd.serve_forever()
-    except KeyboardInterrupt, e:
+    except KeyboardInterrupt as e:
         log.debug("Interrupted by user. Shutting down ...")
     finally:
         log.debug("shutting down server ...")
         httpd.shutdown()
         log.debug("server shut down.")
-
-            
