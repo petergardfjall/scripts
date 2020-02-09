@@ -20,7 +20,7 @@ function die_with_error() {
 
 function print_usage() {
     echo "Generates a server key and certificate signed by a given CA."
-    echo "Example: create-server-cert.sh --output-dir=pki tiller tiller.example.com"
+    echo "Example: ${scriptname} --output-dir=pki tiller tiller.example.com"
     echo
     echo "usage: ${scriptname} [OPTIONS] CN [HOST ...]"
     echo "  --output-dir=PATH   Directory where certs and keys will be written."

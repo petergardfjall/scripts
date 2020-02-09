@@ -21,7 +21,7 @@ function die_with_error() {
 function print_usage() {
     echo "usage: ${scriptname} [OPTIONS] CN"
     echo "Generates a client key and certificate signed by a given CA."
-    echo "Example: create-client-cert.sh --output-dir=pki helm"
+    echo "Example: ${scriptname} --output-dir=pki helm"
     echo
     echo "Options:"
     echo "  --output-dir=PATH     Directory where cert and key will be written."
@@ -36,29 +36,29 @@ function print_usage() {
 
 for arg in $@; do
     case ${arg} in
-	--output-dir=*)
-	    output_dir=${arg#--output-dir=}
-	    ;;
-	--ca-cert=*)
-	    ca_cert=${arg#--ca-cert=}
-	    ;;
-	--ca-key=*)
-	    ca_key=${arg#--ca-key=}
-	    ;;
-	--ca-config=*)
-	    ca_config=${arg#--ca-config=}
-	    ;;
-	--help)
-	    print_usage
-	    exit 0
-	    ;;
-	--*)
-	    print_usage
-	    die_with_error "unrecognized option: ${arg}"
-	    ;;
-	*)
-	    # assume only positional arguments left
-	    break;
+        --output-dir=*)
+            output_dir=${arg#--output-dir=}
+            ;;
+        --ca-cert=*)
+            ca_cert=${arg#--ca-cert=}
+            ;;
+        --ca-key=*)
+            ca_key=${arg#--ca-key=}
+            ;;
+        --ca-config=*)
+            ca_config=${arg#--ca-config=}
+            ;;
+        --help)
+            print_usage
+            exit 0
+            ;;
+        --*)
+            print_usage
+            die_with_error "unrecognized option: ${arg}"
+            ;;
+        *)
+            # assume only positional arguments left
+            break;
     esac
     shift
 done

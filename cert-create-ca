@@ -24,7 +24,7 @@ function print_usage() {
     echo "Usage: ${scriptname} [OPTIONS] CN"
     echo
     echo "Creates a CA certificate with a given common name (the CN argument)."
-    echo "Example: create-ca-cert.sh --output-dir=pki /CN=helm-ca"
+    echo "Example: ${scriptname} --output-dir=pki /CN=helm-ca"
     echo
     echo "Options:"
     echo "  --output-dir=PATH     Directory where CA cert will be written."
