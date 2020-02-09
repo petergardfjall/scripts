@@ -8,7 +8,6 @@
 set -e
 
 scriptname=$(basename ${0})
-bindir=$(dirname ${0})
 
 function log() {
     echo -e "\e[32m[${scriptname}]: ${1}\e[0m"
@@ -34,17 +33,17 @@ mkdir -p ${pki_dir}
 # create a CA cert to sign other certs
 if ! [ -f ${pki_dir}/ca.pem ]; then
     log "creating a CA certificate under ${pki_dir} ..."
-    ${bindir}/create-ca-cert.sh --output-dir=${pki_dir} "/CN=helm-ca" 2>&1 > /dev/null
+    cert-create-ca --output-dir=${pki_dir} "/CN=helm-ca" 2>&1 > /dev/null
 fi
 # create certificate for tiller
 if ! [ -f ${pki_dir}/tiller.pem ]; then
     log "creating a server certificate for tiller under ${pki_dir} ..."
-    ${bindir}/create-server-cert.sh --output-dir=${pki_dir} "tiller" 2>&1 > /dev/null
+    cert-create-casigned-server --output-dir=${pki_dir} "tiller" 2>&1 > /dev/null
 fi
 # create certificate for helm
 if ! [ -f ${pki_dir}/helm.pem ]; then
     log "creating a client certificate for helm under ${pki_dir} ..."
-    ${bindir}/create-client-cert.sh --output-dir=${pki_dir} "helm" 2>&1 > /dev/null
+    cert-create-casigned-client --output-dir=${pki_dir} "helm" 2>&1 > /dev/null
 fi
 
 # create an RBAC service account for tiller
