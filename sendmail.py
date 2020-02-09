@@ -22,7 +22,6 @@ logging.basicConfig(
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--fromaddr", default=None, type=str,
                         help=("From: mail header. If none is given, user will be prompted."))
@@ -37,7 +36,7 @@ if __name__ == "__main__":
                         help=("Password used to authenticate. If none is given, user will be prompted."))
     parser.add_argument("--smtp-host", default="localhost", type=str,
                         help=("SMTP server hostname or IP address."))
-    parser.add_argument("--smtp-port", default=25, type=int,
+    parser.add_argument("--smtp-port", default=587, type=int,
                         help=("SMTP port. Typically one of 25, 465 (SSL), 587 (STARTTLS)."))
     parser.add_argument("--smtp-debuglevel", default=0, type=int,
                         help=("smtplib debug level. Default: 0."))
@@ -48,25 +47,25 @@ if __name__ == "__main__":
     parser.add_argument("toaddr", metavar="<To address>", type=str, help="Email receiver. To: address.")
     args = parser.parse_args()
 
-    
+
     if not args.username:
-        args.username = raw_input("SMTP username: ")        
+        args.username = input("SMTP username: ")
     if not args.password:
         args.password = getpass.getpass("SMTP password: ")
     if not args.fromaddr:
-        args.fromaddr = raw_input("From: ")
+        args.fromaddr = input("From: ")
     if not args.subject:
-        args.subject = raw_input("Subject: ")
+        args.subject = input("Subject: ")
 
     args.lines = []
     if args.message_file:
         with open(args.message_file, "r") as stdin:
             args.lines = stdin.readlines()
     else:
-        print("Message (Ctrl-D twice to end): ")
+        print("Message (Ctrl-d to end): ")
         for line in sys.stdin:
             args.lines.append(line)
-            
+
     msg = MIMEText("".join(args.lines))
     msg['Subject'] = args.subject
     msg['From'] = args.fromaddr
