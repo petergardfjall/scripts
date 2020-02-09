@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
-import urllib
+import urllib.parse
 
 if len(sys.argv) < 1:
-   print "error: missing arguments2"
+   print("error: missing argument")
 
 for arg in sys.argv[1:]:
-   print urllib.quote(arg)
+   print(urllib.parse.quote(arg))
