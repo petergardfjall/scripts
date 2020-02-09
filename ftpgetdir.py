@@ -46,6 +46,3 @@ if __name__ == "__main__":
         )
     ftp.quit()
     logger.info("Done.")
-
-
-    
