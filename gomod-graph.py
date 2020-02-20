@@ -23,21 +23,23 @@ class ModuleEncoder(json.JSONEncoder):
         return o.__dict__
 
 class Module:
-    def __init__(self, name, version=None):
+    def __init__(self, name, effective_version=None, desired_version=None):
         self.name = name
-        self.version = version
+        # version that will be used in build (seen in 'go list -m all')
+        self.effective_version = effective_version
+        # version of module desired by a consuming module in 'go mod graph'
+        self.desired_version = desired_version
         # module name -> module
         self.child_modules = {}
 
     def id(self):
         id = self.name
-        if self.version:
-            id += "@" + self.version
+        if self.effective_version:
+            id += "@" + self.effective_version
         return id
 
     def todict(self):
         return self.__dict__
-
 
 
 def get_root_module(module_root_dir):
@@ -46,12 +48,13 @@ def get_root_module(module_root_dir):
     return output.decode('utf-8').strip()
 
 
-def get_modules(module_root_dir):
-    """Return the list of modules included in the build for the Go module rooted at
-    the specified directory. The function returns a map of module id -> Module
-    objects.
+def get_effective_module_versions(module_root_dir):
+    """Return the map of effective module versions included in the build for the Go
+    module rooted at the specified directory. The function returns a map of
+    module name -> version.
+
     """
-    modules = {}
+    module_versions = {}
 
     # View final versions that will be used in a build for all direct and
     # indirect dependencies.
@@ -63,22 +66,28 @@ def get_modules(module_root_dir):
         if m:
             mod_name = m.group(1)
             mod_version = m.group(2)
-            module = Module(mod_name, mod_version)
-            modules[module.id()] = module
+            module_versions[mod_name] = mod_version
 
-    return modules
+    return module_versions
 
 
-def connect_module_graph(module_map, module_root_dir):
-    """Connect nodes in the module_map in-place by parsing module connections from
-    'go mod graph'.
+def build_module_graph(module_root_dir, effective_module_versions):
+    """Return a map of modules (and their dependencies) by parsing module
+    connections from 'go mod graph'.
+
+    :param module_root_dir: Directory containing go.mod
+    :param effective_module_versions: Map of effective module versions used in
+      build: `<mod name> -> <effective module version>`.
     """
+
+    module_map = {}
 
     # Each line in the output has two fields: the first column is a consuming
     # module, and the second column is one of that module's requirements
-    # (including the version required by that consuming module).  Note that not
-    # all of these dependencies are included in the build (those are listed in
-    # 'go list -m all').
+    # (including the version required by that consuming module). Note that not
+    # all of these dependencies are included in the build; some versions are
+    # ones desired by a consuming module. Those effective module versions that
+    # are actually included in the build are found from 'go list -m all'.
     output = subprocess.check_output(["go", "mod", "graph"],
                                      cwd=module_root_dir)
     lines = output.decode('utf-8')
@@ -93,15 +102,17 @@ def connect_module_graph(module_map, module_root_dir):
             if not parent_module_id in module_map:
                 mod_name = parent_module_id.split("@")[0]
                 mod_version = m.group(2)
-                module_map[parent_module_id] = Module(mod_name, mod_version)
+                module_map[parent_module_id] = Module(mod_name, desired_version=mod_version, effective_version=effective_module_versions[mod_name])
             if not child_module_id in module_map:
                 mod_name = child_module_id.split("@")[0]
                 mod_version = child_module_id.split("@")[1]
-                module_map[child_module_id] = Module(mod_name, mod_version)
+                module_map[child_module_id] = Module(mod_name,  desired_version=mod_version, effective_version=effective_module_versions[mod_name])
 
             parent_module = module_map[parent_module_id]
             child_module = module_map[child_module_id]
             parent_module.child_modules[child_module_id] = child_module
+
+    return module_map
 
 
 if __name__ == "__main__":
@@ -116,8 +127,11 @@ if __name__ == "__main__":
         raise ValueError(f"module root directory does not exist: {args.module_root_dir}")
 
 
-    module_map = get_modules(args.module_root)
-    connect_module_graph(module_map, args.module_root)
+    # <mod name> -> version map of effective versions used in build
+    effective_module_versions = get_effective_module_versions(args.module_root)
+
+    # <name>@<version> -> Module map of all encountered modules in module graph
+    module_map = build_module_graph(args.module_root, effective_module_versions)
     root_module_name = get_root_module(args.module_root)
 
     print(json.dumps(module_map[root_module_name], cls=ModuleEncoder, indent=4))
