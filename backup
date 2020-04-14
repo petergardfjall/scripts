@@ -1,0 +1,256 @@
+#!/usr/bin/env python
+
+import argparse
+import getpass
+import logging
+import os
+import os.path
+import subprocess
+import sys
+
+MAIN_HELP = """
+Backs up a collection of local directories to a remote cloud storage using
+duplicity to perform incremental backups.
+
+The following environment variables are used to control logging:
+
+- LOG_LEVEL: defaults to 'INFO'.
+- LOG_FILE: defaults to None (write to stdout).
+"""
+
+GDRIVE_HELP = """
+Backs up each given local directory DIR to the given Google Drive
+folder using the specified Google account. To delegate duplicity
+access rights to your Drive, you need to create an OAuth client ID
+credential (of type 'Other') in the Google Developer Console.
+For details on setting up the Google service account and the appearance of
+the Google Drive settings file required by duplicity, refer to the
+the pydrive section of http://duplicity.nongnu.org/docs.html.
+
+The client credential file is passed via the --gdrive-settings flag.
+The script must be run interactively the first time, since the
+user will need to open a consent screen in the browser.
+
+NOTE: to be able to backup files in system directories you need
+      to run this script with sudo privileges.
+
+To restore a certain backed up dir/file to a given point in time use
+(run as root to get restored file ownerships correct):
+
+  duplicity restore --no-encryption [--file-to-restore <relpath>] [--time <time>] pydrive://<google-account-mail>:/<folder> <local_dest_dir>
+"""
+
+S3_HELP = """
+Backs up each given local directory DIR to the given S3 bucket.
+The following environment variables need to be set:
+
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+
+NOTE: to be able to backup files in system directories you need
+      to run this script with sudo privileges.
+
+To restore a certain backed up dir/file to a given point in time use
+(run as root to get restored file ownerships correct):
+
+  source my-aws-credentials.env
+  duplicity restore --no-encryption [--file-to-restore <relpath>] [--time <time>] <S3-URL> <local_dest_dir>
+"""
+
+
+LOG_LEVEL = logging.INFO
+if 'LOG_LEVEL' in os.environ:
+    LOG_LEVEL = getattr(logging, os.environ['LOG_LEVEL'])
+
+log_file = None
+if 'LOG_FILE' in os.environ:
+    log_file = os.environ['LOG_FILE']
+
+log = logging.getLogger(__name__)
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s", filename=log_file)
+
+
+def ensure_env(env_var):
+    if not env_var in os.environ:
+        raise ValueError(f'environment variable {env_var} must be set.')
+
+
+def ensure_file(path):
+    if not os.path.isfile(path):
+        raise ValueError(f'{path}: no such file')
+
+
+def abspath(path):
+    p = os.path.normpath(path)
+    if os.path.isabs(p):
+        return p
+    return os.path.join("/", p)
+
+
+def duplicity_backup_cmd(backup_dirs, dest_url, excludes_file=None, full_backup_period=14):
+    args = [
+        "duplicity",
+        "--full-if-older-than", str(full_backup_period) + "D",
+        "--verbosity", "warning",
+        "--no-encryption",
+        "--progress",
+    ]
+    if excludes_file:
+        args += ["--exclude-filelist", excludes_file]
+    for dir in backup_dirs:
+        args += ["--include", dir]
+    args += ["--exclude", "**"]
+    args += ["/"]
+    args += [dest_url]
+    return args
+
+
+def duplicity_restore_cmd(source_url, dest_dir):
+    """duplicity command to restore files in cloud backup at `source_url`
+    to local directory `dest_dir`."""
+    return [
+        "duplicity",
+        "restore",
+        "--no-encryption",
+        source_url,
+        dest_dir,
+    ]
+
+
+def duplicity_cleanup_cmd(dest_url, retained_full_backups=2):
+    return list(map(str, [
+        "duplicity",
+        "remove-all-but-n-full", retained_full_backups,
+        "--force",
+        dest_url,
+    ]))
+
+
+def do(argv, env=None, dry_run=True):
+    """Executes an os process using the provided argument list. A
+    subprocess.CalledProcessError is raised on failure."""
+    if not env:
+        env = os.environ
+
+    prefix = "**DRY RUN** " if dry_run else ""
+    log.info("%sexecuting as '%s': %s", prefix, getpass.getuser(), " ".join(argv))
+    if not dry_run:
+        subprocess.run(argv, check=True, shell=False, env=env)
+
+def s3_backup(args):
+    if args.aws_access_key_id:
+        os.environ["AWS_ACCESS_KEY_ID"] = args.aws_access_key_id
+    if args.aws_secret_access_key:
+        os.environ["AWS_SECRET_ACCESS_KEY"] = args.aws_secret_access_key
+
+    ensure_env("AWS_ACCESS_KEY_ID")
+    ensure_env("AWS_SECRET_ACCESS_KEY")
+
+    log.info("backing up %s to AWS S3 ...", ", ".join(args.dirs))
+    bucket_path = abspath(args.bucket_path)
+    # use duplicity's boto3 backend for S3
+    dest_url = f'boto3+s3://s3-{args.aws_region}.amazonaws.com{bucket_path}'
+    do(duplicity_backup_cmd(args.dirs, dest_url, excludes_file=args.excludes_file, full_backup_period=args.full_backup_period), dry_run=args.dry_run)
+
+    log.info("removing backups to keep only %d full backup chains ...", args.retained_full_backups)
+    do(duplicity_cleanup_cmd(dest_url, retained_full_backups=args.retained_full_backups), dry_run=args.dry_run)
+
+
+def s3_restore(args):
+    if args.aws_access_key_id:
+        os.environ["AWS_ACCESS_KEY_ID"] = args.aws_access_key_id
+    if args.aws_secret_access_key:
+        os.environ["AWS_SECRET_ACCESS_KEY"] = args.aws_secret_access_key
+
+    ensure_env("AWS_ACCESS_KEY_ID")
+    ensure_env("AWS_SECRET_ACCESS_KEY")
+
+    bucket_path = abspath(args.bucket_path)
+    log.info("restoring from AWS S3 bucket %s to %s ...", bucket_path, args.dest_dir)
+    # use duplicity's boto3 backend for S3
+    source_url = f'boto3+s3://s3-{args.aws_region}.amazonaws.com{bucket_path}'
+    do(duplicity_restore_cmd(source_url, args.dest_dir), dry_run=args.dry_run)
+
+
+def gdrive_backup(args):
+    if args.gdrive_settings:
+        os.environ["GOOGLE_DRIVE_SETTINGS"] = args.gdrive_settings
+
+    ensure_env("GOOGLE_DRIVE_SETTINGS")
+
+    log.info("backing up %s to Google Drive ...", ", ".join(args.dirs))
+    dest_path = abspath(args.drive_path)
+    dest_url = f'pydrive://{args.email}{dest_path}'
+    do(duplicity_backup_cmd(args.dirs, dest_url, excludes_file=args.excludes_file, full_backup_period=args.full_backup_period), dry_run=args.dry_run)
+
+    log.info("removing backups to keep only %d full backup chains ...", args.retained_full_backups)
+    do(duplicity_cleanup_cmd(dest_url, retained_full_backups=args.retained_full_backups), dry_run=args.dry_run)
+
+
+def gdrive_restore(args):
+    if args.gdrive_settings:
+        os.environ["GOOGLE_DRIVE_SETTINGS"] = args.gdrive_settings
+
+    ensure_env("GOOGLE_DRIVE_SETTINGS")
+
+    drive_path = abspath(args.drive_path)
+    log.info("restoring from Google Drive folder %s to %s ...", drive_path, args.dest_dir)
+    source_url = f'pydrive://{args.email}{drive_path}'
+    do(duplicity_restore_cmd(source_url, args.dest_dir), dry_run=args.dry_run)
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="backup", description=MAIN_HELP, formatter_class=argparse.RawTextHelpFormatter)
+    subparsers = parser.add_subparsers()
+
+    backup_common = argparse.ArgumentParser(add_help=False)
+    backup_common.add_argument('dirs', metavar="DIR", nargs='+', type=str, help="A directory to be backed up.")
+    backup_common.add_argument('--excludes-file', type=str, help="A file listing file patterns that are to be excluded from backup. See the duplicity man page (FILE SELECTION).")
+    backup_common.add_argument('--full-backup-period', default=14, type=int, help="Number of days between every time a new full backup chain is started.")
+    backup_common.add_argument('--retained-full-backups', default=2, type=int, help="Number of full backup chains to keep around.")
+    backup_common.add_argument('--dry-run', action='store_true', help="Only output commands that would be executed.")
+
+    restore_common = argparse.ArgumentParser(add_help=False)
+    restore_common.add_argument('--dry-run', action='store_true', help="Only output commands that would be executed.")
+
+    s3_common = argparse.ArgumentParser(add_help=False, parents=[])
+    s3_common.add_argument('--bucket-path', metavar="<BUCKET>", type=str, required=True, help="Destination bucket for the backup. For example: my/backup/bucket.")
+    s3_common.add_argument('--aws-region', metavar="<REGION>", type=str, default="eu-west-1", help="Location of backup bucket. Default: eu-west-1")
+    s3_common.add_argument('--aws-access-key-id', metavar="<ID>", type=str, help="AWS access key ID. Overrides AWS_ACCESS_KEY_ID in environment.")
+    s3_common.add_argument('--aws-secret-access-key', metavar="<KEY>", type=str, help="AWS secret access key. Overrides AWS_SECRET_ACCESS_KEY in environment.")
+
+    s3 = subparsers.add_parser("s3", help="Manage AWS S3 backups.")
+    s3subparsers = s3.add_subparsers()
+    s3_create = s3subparsers.add_parser("create", help="Perform a backup against AWS S3.", parents=[backup_common, s3_common], description=S3_HELP, formatter_class=argparse.RawTextHelpFormatter)
+    s3_create.set_defaults(func=s3_backup)
+    s3_restore_cmd = s3subparsers.add_parser("restore", help="Restore a backup from AWS S3.", parents=[restore_common, s3_common], formatter_class=argparse.RawTextHelpFormatter)
+    s3_restore_cmd.add_argument('dest_dir', metavar='<DIR>', help="Destination directory for restore.")
+    s3_restore_cmd.set_defaults(func=s3_restore)
+
+    gdrive_common = argparse.ArgumentParser(add_help=False, parents=[])
+    gdrive_common.add_argument('--email', type=str, required=True, help="Google Drive account email.")
+    gdrive_common.add_argument('--gdrive-settings', type=str, required=True, help="A GOOGLE_DRIVE_SETTINGS file to be used by duplicity to authenticate. See `a Note on Pydrive Backend` in the duplicity man page.")
+    gdrive_common.add_argument('--drive-path', type=str, required=True, help="Destination folder path in Google Drive for the backup. For example: my/backup.")
+
+    gdrive = subparsers.add_parser("gdrive", help="Manage Google Drive backups.")
+    gdrive_subparsers = gdrive.add_subparsers()
+
+    gdrive_create = gdrive_subparsers.add_parser("create", parents=[backup_common, gdrive_common], help="Perform a backup against Google Drive.", description=GDRIVE_HELP, formatter_class=argparse.RawTextHelpFormatter)
+    gdrive_create.set_defaults(func=gdrive_backup)
+    gdrive_restore_cmd = gdrive_subparsers.add_parser("restore", parents=[restore_common, gdrive_common], help="Restore a backup from Google Drive.", formatter_class=argparse.RawTextHelpFormatter)
+    gdrive_restore_cmd.add_argument('dest_dir', metavar='<DIR>', help="Destination directory for restore.")
+    gdrive_restore_cmd.set_defaults(func=gdrive_restore)
+
+    args = parser.parse_args()
+    if not "func" in args:
+        parser.print_help()
+        sys.exit(1)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as e:
+        log.fatal(str(e))
+        raise
