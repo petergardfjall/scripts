@@ -62,13 +62,13 @@ LOG_LEVEL = logging.INFO
 if 'LOG_LEVEL' in os.environ:
     LOG_LEVEL = getattr(logging, os.environ['LOG_LEVEL'])
 
-log_file = None
+logstream = sys.stdout
 if 'LOG_FILE' in os.environ:
-    log_file = os.environ['LOG_FILE']
+    logstream = open(os.environ['LOG_FILE'], "a")
 
+
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s", stream=logstream)
 log = logging.getLogger(__name__)
-logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s", filename=log_file)
-
 
 def ensure_env(env_var):
     if not env_var in os.environ:
@@ -135,7 +135,7 @@ def do(argv, env=None, dry_run=True):
     prefix = "**DRY RUN** " if dry_run else ""
     log.info("%sexecuting as '%s': %s", prefix, getpass.getuser(), " ".join(argv))
     if not dry_run:
-        subprocess.run(argv, check=True, shell=False, env=env)
+        subprocess.run(argv, check=True, shell=False, env=env, stdout=logstream, stderr=logstream)
 
 def s3_backup(args):
     if args.aws_access_key_id:
@@ -246,6 +246,7 @@ def main():
         parser.print_help()
         sys.exit(1)
     args.func(args)
+    log.info("done")
 
 
 if __name__ == "__main__":
