@@ -149,7 +149,7 @@ def s3_backup(args):
     log.info("backing up %s to AWS S3 ...", ", ".join(args.dirs))
     bucket_path = abspath(args.bucket_path)
     # use duplicity's boto3 backend for S3
-    dest_url = f'boto3+s3://s3-{args.aws_region}.amazonaws.com{bucket_path}'
+    dest_url = f'boto3+s3://{bucket_path}'
     do(duplicity_backup_cmd(args.dirs, dest_url, excludes_file=args.excludes_file, full_backup_period=args.full_backup_period), dry_run=args.dry_run)
 
     log.info("removing backups to keep only %d full backup chains ...", args.retained_full_backups)
