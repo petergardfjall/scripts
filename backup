@@ -8,6 +8,9 @@ import os.path
 import subprocess
 import sys
 
+from typing import Dict, List, Tuple
+
+
 MAIN_HELP = """
 Backs up a collection of local directories to a remote cloud storage using
 duplicity to perform incremental backups.
@@ -87,7 +90,11 @@ def abspath(path):
     return os.path.join("/", p)
 
 
-def duplicity_backup_cmd(backup_dirs, dest_url, excludes_file=None, full_backup_period=14):
+def duplicity_backup_cmd(backup_dirs: List[str], dest_url: str, excludes_file :str=None, full_backup_period :int=14, extra_opts :List[Tuple[str, str]]=None):
+    """duplicity command to produce a cloud backup of the local directories
+    specified in `backup_dirs` to the duplicity destination `dest_url`.
+    `extra_opts` is a list of tuples, such as `[("--opt1", "val1"), ...]`.
+    """
     args = [
         "duplicity",
         "--full-if-older-than", str(full_backup_period) + "D",
@@ -95,6 +102,8 @@ def duplicity_backup_cmd(backup_dirs, dest_url, excludes_file=None, full_backup_
         "--no-encryption",
         "--progress",
     ]
+    if extra_opts:
+        args += [ f'{opt}={val}' for (opt,val) in extra_opts]
     if excludes_file:
         args += ["--exclude-filelist", excludes_file]
     for dir in backup_dirs:
@@ -105,28 +114,39 @@ def duplicity_backup_cmd(backup_dirs, dest_url, excludes_file=None, full_backup_
     return args
 
 
-def duplicity_restore_cmd(source_url, dest_dir):
-    """duplicity command to restore files in cloud backup at `source_url`
-    to local directory `dest_dir`."""
-    return [
+def duplicity_restore_cmd(source_url :str, dest_dir :str, extra_opts :List[Tuple[str, str]]=None):
+    """duplicity command to restore files in cloud backup at `source_url` to local
+    directory `dest_dir`. `extra_opts` is a list of tuples, such as
+    `[("--opt1", "val1"), ...]`.
+
+    """
+    args = [
         "duplicity",
         "restore",
         "--no-encryption",
         source_url,
         dest_dir,
     ]
+    if extra_opts:
+        args += [ f'{opt}={val}' for (opt,val) in extra_opts]
+
+    return args
 
 
-def duplicity_cleanup_cmd(dest_url, retained_full_backups=2):
-    return list(map(str, [
+def duplicity_cleanup_cmd(dest_url :str, retained_full_backups :int=2, extra_opts :List[Tuple[str, str]]=None):
+    args = [
         "duplicity",
-        "remove-all-but-n-full", retained_full_backups,
+        "remove-all-but-n-full", str(retained_full_backups),
         "--force",
-        dest_url,
-    ]))
+
+    ]
+    if extra_opts:
+        args += [ f'{opt}={val}' for (opt,val) in extra_opts]
+    args += [dest_url]
+    return args
 
 
-def do(argv, env=None, dry_run=True):
+def do(argv :List[str], env :Dict[str,str]=None, dry_run :bool=True):
     """Executes an os process using the provided argument list. A
     subprocess.CalledProcessError is raised on failure."""
     if not env:
@@ -145,15 +165,18 @@ def s3_backup(args):
 
     ensure_env("AWS_ACCESS_KEY_ID")
     ensure_env("AWS_SECRET_ACCESS_KEY")
+    extra_opts = [("--s3-region-name", args.aws_region)]
 
     log.info("backing up %s to AWS S3 ...", ", ".join(args.dirs))
     bucket_path = abspath(args.bucket_path)
     # use duplicity's boto3 backend for S3
     dest_url = f'boto3+s3://{bucket_path}'
-    do(duplicity_backup_cmd(args.dirs, dest_url, excludes_file=args.excludes_file, full_backup_period=args.full_backup_period), dry_run=args.dry_run)
+    do(duplicity_backup_cmd(args.dirs, dest_url, excludes_file=args.excludes_file, full_backup_period=args.full_backup_period, extra_opts=extra_opts),
+       dry_run=args.dry_run)
 
     log.info("removing backups to keep only %d full backup chains ...", args.retained_full_backups)
-    do(duplicity_cleanup_cmd(dest_url, retained_full_backups=args.retained_full_backups), dry_run=args.dry_run)
+    do(duplicity_cleanup_cmd(dest_url, retained_full_backups=args.retained_full_backups, extra_opts=extra_opts),
+       dry_run=args.dry_run)
 
 
 def s3_restore(args):
@@ -164,12 +187,14 @@ def s3_restore(args):
 
     ensure_env("AWS_ACCESS_KEY_ID")
     ensure_env("AWS_SECRET_ACCESS_KEY")
+    extra_opts = [("--s3-region-name", args.aws_region)]
 
     bucket_path = abspath(args.bucket_path)
     log.info("restoring from AWS S3 bucket %s to %s ...", bucket_path, args.dest_dir)
     # use duplicity's boto3 backend for S3
-    source_url = f'boto3+s3://s3-{args.aws_region}.amazonaws.com{bucket_path}'
-    do(duplicity_restore_cmd(source_url, args.dest_dir), dry_run=args.dry_run)
+    source_url = f'boto3+s3://{bucket_path}'
+    do(duplicity_restore_cmd(source_url, args.dest_dir, extra_opts=extra_opts),
+       dry_run=args.dry_run)
 
 
 def gdrive_backup(args):
