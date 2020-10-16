@@ -187,6 +187,8 @@ def s3_restore(args):
     """Restores a full backup to a given destination directory."""
     ensure_aws_credentials(args)
     extra_opts = [("--s3-region-name", args.aws_region)]
+    if args.restore_time:
+        extra_opts += [("--restore-time", args.restore_time)]
 
     bucket_path = abspath(args.bucket_path)
     log.info("restoring from AWS S3 bucket %s to %s ...", bucket_path, args.dest_dir)
@@ -205,6 +207,8 @@ def s3_restore_path(args):
         ("--s3-region-name", args.aws_region),
         ("--file-to-restore", args.path),
     ]
+    if args.restore_time:
+        extra_opts += [("--restore-time", args.restore_time)]
 
     bucket_path = abspath(args.bucket_path)
     log.info("restoring %s from AWS S3 bucket %s to %s ...", args.path, bucket_path, args.dest_dir)
@@ -235,6 +239,9 @@ def gdrive_backup(args):
 def gdrive_restore(args):
     ensure_gdrive_settings(args)
 
+    if args.restore_time:
+        extra_opts += [("--restore-time", args.restore_time)]
+
     drive_path = abspath(args.drive_path)
     log.info("restoring from Google Drive folder %s to %s ...", drive_path, args.dest_dir)
     source_url = f'pydrive://{args.email}{drive_path}'
@@ -245,6 +252,8 @@ def gdrive_restore_path(args):
     ensure_gdrive_settings(args)
 
     extra_opts = [("--file-to-restore", args.path)]
+    if args.restore_time:
+        extra_opts += [("--restore-time", args.restore_time)]
 
     drive_path = abspath(args.drive_path)
     log.info("restoring from Google Drive folder %s to %s ...", drive_path, args.dest_dir)
@@ -265,6 +274,7 @@ def main():
 
     restore_common = argparse.ArgumentParser(add_help=False)
     restore_common.add_argument('--dry-run', action='store_true', help="Only output commands that would be executed.")
+    restore_common.add_argument('--restore-time', metavar="<TIME>", type=str, help="The time from which to restore. Specify as date (`YYYY/MM/DD`), interval like `2D` (days), seconds from epoch, or timestamp `2002-01-25T07:00:00`.")
 
     s3_common = argparse.ArgumentParser(add_help=False, parents=[])
     s3_common.add_argument('--bucket-path', metavar="<BUCKET>", type=str, required=True, help="Destination bucket for the backup. For example: my/backup/bucket.")
