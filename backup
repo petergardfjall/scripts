@@ -157,16 +157,20 @@ def do(argv :List[str], env :Dict[str,str]=None, dry_run :bool=True):
     if not dry_run:
         subprocess.run(argv, check=True, shell=False, env=env, stdout=logstream, stderr=logstream)
 
-def s3_backup(args):
+
+def ensure_aws_credentials(args):
     if args.aws_access_key_id:
         os.environ["AWS_ACCESS_KEY_ID"] = args.aws_access_key_id
     if args.aws_secret_access_key:
         os.environ["AWS_SECRET_ACCESS_KEY"] = args.aws_secret_access_key
-
     ensure_env("AWS_ACCESS_KEY_ID")
     ensure_env("AWS_SECRET_ACCESS_KEY")
-    extra_opts = [("--s3-region-name", args.aws_region)]
 
+
+def s3_backup(args):
+    ensure_aws_credentials(args)
+
+    extra_opts = [("--s3-region-name", args.aws_region)]
     log.info("backing up %s to AWS S3 ...", ", ".join(args.dirs))
     bucket_path = abspath(args.bucket_path)
     # use duplicity's boto3 backend for S3
@@ -180,13 +184,8 @@ def s3_backup(args):
 
 
 def s3_restore(args):
-    if args.aws_access_key_id:
-        os.environ["AWS_ACCESS_KEY_ID"] = args.aws_access_key_id
-    if args.aws_secret_access_key:
-        os.environ["AWS_SECRET_ACCESS_KEY"] = args.aws_secret_access_key
-
-    ensure_env("AWS_ACCESS_KEY_ID")
-    ensure_env("AWS_SECRET_ACCESS_KEY")
+    """Restores a full backup to a given destination directory."""
+    ensure_aws_credentials(args)
     extra_opts = [("--s3-region-name", args.aws_region)]
 
     bucket_path = abspath(args.bucket_path)
@@ -197,11 +196,32 @@ def s3_restore(args):
        dry_run=args.dry_run)
 
 
-def gdrive_backup(args):
+def s3_restore_path(args):
+    """Restores a particular backed up file/directory to a given destination
+    directory."""
+    ensure_aws_credentials(args)
+
+    extra_opts = [
+        ("--s3-region-name", args.aws_region),
+        ("--file-to-restore", args.path),
+    ]
+
+    bucket_path = abspath(args.bucket_path)
+    log.info("restoring %s from AWS S3 bucket %s to %s ...", args.path, bucket_path, args.dest_dir)
+    # use duplicity's boto3 backend for S3
+    source_url = f'boto3+s3://{bucket_path}'
+    do(duplicity_restore_cmd(source_url, args.dest_dir, extra_opts=extra_opts),
+       dry_run=args.dry_run)
+
+
+def ensure_gdrive_settings(args):
     if args.gdrive_settings:
         os.environ["GOOGLE_DRIVE_SETTINGS"] = args.gdrive_settings
-
     ensure_env("GOOGLE_DRIVE_SETTINGS")
+
+
+def gdrive_backup(args):
+    ensure_gdrive_settings(args)
 
     log.info("backing up %s to Google Drive ...", ", ".join(args.dirs))
     dest_path = abspath(args.drive_path)
@@ -213,15 +233,23 @@ def gdrive_backup(args):
 
 
 def gdrive_restore(args):
-    if args.gdrive_settings:
-        os.environ["GOOGLE_DRIVE_SETTINGS"] = args.gdrive_settings
-
-    ensure_env("GOOGLE_DRIVE_SETTINGS")
+    ensure_gdrive_settings(args)
 
     drive_path = abspath(args.drive_path)
     log.info("restoring from Google Drive folder %s to %s ...", drive_path, args.dest_dir)
     source_url = f'pydrive://{args.email}{drive_path}'
     do(duplicity_restore_cmd(source_url, args.dest_dir), dry_run=args.dry_run)
+
+
+def gdrive_restore_path(args):
+    ensure_gdrive_settings(args)
+
+    extra_opts = [("--file-to-restore", args.path)]
+
+    drive_path = abspath(args.drive_path)
+    log.info("restoring from Google Drive folder %s to %s ...", drive_path, args.dest_dir)
+    source_url = f'pydrive://{args.email}{drive_path}'
+    do(duplicity_restore_cmd(source_url, args.dest_dir, extra_opts=extra_opts), dry_run=args.dry_run)
 
 
 def main():
@@ -246,11 +274,18 @@ def main():
 
     s3 = subparsers.add_parser("s3", help="Manage AWS S3 backups.")
     s3subparsers = s3.add_subparsers()
+    # create backup
     s3_create = s3subparsers.add_parser("create", help="Perform a backup against AWS S3.", parents=[backup_common, s3_common], description=S3_HELP, formatter_class=argparse.RawTextHelpFormatter)
     s3_create.set_defaults(func=s3_backup)
+    # restore backup
     s3_restore_cmd = s3subparsers.add_parser("restore", help="Restore a backup from AWS S3.", parents=[restore_common, s3_common], formatter_class=argparse.RawTextHelpFormatter)
     s3_restore_cmd.add_argument('dest_dir', metavar='<DIR>', help="Destination directory for restore.")
     s3_restore_cmd.set_defaults(func=s3_restore)
+    # restore-path from backup
+    s3_restore_path_cmd = s3subparsers.add_parser("restore-path", help="Restore a particular file/dir from an AWS S3 backup.", parents=[restore_common, s3_common], formatter_class=argparse.RawTextHelpFormatter)
+    s3_restore_path_cmd.add_argument('path', metavar='<PATH>', help="Path (within backup) to be restored.")
+    s3_restore_path_cmd.add_argument('dest_dir', metavar='<DIR>', help="Destination directory for restore.")
+    s3_restore_path_cmd.set_defaults(func=s3_restore_path)
 
     gdrive_common = argparse.ArgumentParser(add_help=False, parents=[])
     gdrive_common.add_argument('--email', type=str, required=True, help="Google Drive account email.")
@@ -259,12 +294,18 @@ def main():
 
     gdrive = subparsers.add_parser("gdrive", help="Manage Google Drive backups.")
     gdrive_subparsers = gdrive.add_subparsers()
-
+    # create backup
     gdrive_create = gdrive_subparsers.add_parser("create", parents=[backup_common, gdrive_common], help="Perform a backup against Google Drive.", description=GDRIVE_HELP, formatter_class=argparse.RawTextHelpFormatter)
     gdrive_create.set_defaults(func=gdrive_backup)
+    # restore backup
     gdrive_restore_cmd = gdrive_subparsers.add_parser("restore", parents=[restore_common, gdrive_common], help="Restore a backup from Google Drive.", formatter_class=argparse.RawTextHelpFormatter)
     gdrive_restore_cmd.add_argument('dest_dir', metavar='<DIR>', help="Destination directory for restore.")
     gdrive_restore_cmd.set_defaults(func=gdrive_restore)
+    # restore-path from backup
+    gdrive_restore_path_cmd = gdrive_subparsers.add_parser("restore-path", parents=[restore_common, gdrive_common], help="Restore a particular file/dir from a Google Drive backup.", formatter_class=argparse.RawTextHelpFormatter)
+    gdrive_restore_path_cmd.add_argument('path', metavar='<PATH>', help="Path (within backup) to be restored.")
+    gdrive_restore_path_cmd.add_argument('dest_dir', metavar='<DIR>', help="Destination directory for restore.")
+    gdrive_restore_path_cmd.set_defaults(func=gdrive_restore_path)
 
     args = parser.parse_args()
     if not "func" in args:
