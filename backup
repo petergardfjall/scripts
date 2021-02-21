@@ -268,8 +268,8 @@ def main():
     backup_common = argparse.ArgumentParser(add_help=False)
     backup_common.add_argument('dirs', metavar="DIR", nargs='+', type=str, help="A directory to be backed up.")
     backup_common.add_argument('--excludes-file', type=str, help="A file listing file patterns that are to be excluded from backup. See the duplicity man page (FILE SELECTION).")
-    backup_common.add_argument('--full-backup-period', default=14, type=int, help="Number of days between every time a new full backup chain is started.")
-    backup_common.add_argument('--retained-full-backups', default=2, type=int, help="Number of full backup chains to keep around.")
+    backup_common.add_argument('--full-backup-period', default=7, type=int, help="Number of days between every time a new full backup chain is started.")
+    backup_common.add_argument('--retained-full-backups', default=1, type=int, help="Number of full backup chains to keep around.")
     backup_common.add_argument('--dry-run', action='store_true', help="Only output commands that would be executed.")
 
     restore_common = argparse.ArgumentParser(add_help=False)
