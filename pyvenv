@@ -1,0 +1,27 @@
+#!/bin/bash
+
+#
+# simple helper script for creating a python virtual environment with the latest
+# version of pip. It's intended to be used as so:
+#
+#    # create virtualenv called `.venv` and activate it
+#    source <(pyvenv)
+#
+#    # create virtualenv called `myvenv` and activate it
+#    source <(pyvenv myvenv)
+#
+
+set -e
+
+venv_name="${1:-.venv}"
+
+if [ -e "${venv_name}" ]; then
+    echo "'error: directory/file already exists: ${venv_name}'"
+    exit 0
+fi
+
+python -m venv ${venv_name} > /dev/null 2>&1
+. ${venv_name}/bin/activate
+pip install --upgrade pip > /dev/null 2>&1
+
+echo ". ${venv_name}/bin/activate"
