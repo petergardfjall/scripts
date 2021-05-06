@@ -44,7 +44,7 @@ done
 root_pid="${1}"
 
 while ps -p ${root_pid} > /dev/null; do
-    children=$(pstree -p ${root_pid} | grep -o '([0-9]\+)' | grep -o '[0-9]\+' | xargs echo | sed 's/ /,/g')
+    children=$(pstree -p ${root_pid} --hide-threads | grep -o '([0-9]\+)' | grep -o '[0-9]\+' | xargs echo | sed 's/ /,/g')
 
     pidstat --human -p ${children} -r -l
     sleep ${period}
