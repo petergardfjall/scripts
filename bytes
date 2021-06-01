@@ -1,0 +1,58 @@
+#!/bin/bash
+
+script=$(basename ${0})
+
+set -e
+
+function print_usage {
+    echo "usage: ${script} [OPTIONS] FILE"
+    echo
+    echo "Prints a range of bytes [start,end] from a file."
+    echo
+    echo "Options:"
+    echo "--start=OFFSET  The byte offset to start at. Default: 0"
+    echo "--end=OFFSET    The byte offset to end at. Default: EOF."
+}
+
+function die {
+    echo "error: ${1}"
+    exit 1
+}
+
+start=0
+end=-1
+for arg in ${@}; do
+    case ${arg} in
+        --start=*)
+            start=${arg/*=/}
+            ;;
+        --end=*)
+            end=${arg/*=/}
+            ;;
+        --help)
+            print_usage
+            exit 0
+            ;;
+        --*)
+            die "unrecognized option: ${arg}"
+            ;;
+        *)
+            # no option, assume only positional arguments left
+            break
+            ;;
+    esac
+    shift
+done
+
+[ -z "${1}" ] && die "no file given"
+file=${1}
+
+start_offset=$(( ${start} + 1 ))
+end_offset=$(( ${end} + 1 ))
+command="cat ${file} | tail --bytes=+${start_offset}"
+if [ "${end}" -ge 0 ]; then
+    count=$(( ${end} - ${start} + 1 ))
+    command="${command} | head --bytes=${count}"
+fi
+
+eval ${command}
