@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import argparse
+from argparse import HelpFormatter, RawTextHelpFormatter
 import http.client
 import logging
 import os
@@ -83,8 +84,13 @@ Examples:
     apt-repo-dl.py --repo=http://packages.microsoft.com/repos/code --dist=stable --area=main --arch=arm64 packages
 """
 
+class MyHelpFormatter(argparse.ArgumentDefaultsHelpFormatter,argparse.RawTextHelpFormatter):
+    """Help text formatter which both outputs defaults when calling `--help` and
+    also accepts newlines in the description text."""
+    pass
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=MyHelpFormatter)
     parser.add_argument("--repo", default="http://se.archive.ubuntu.com/ubuntu", help="APT repository such as `https://ftp.debian.org/debian`.")
     parser.add_argument("--dist", default="focal", help="Distribution. For example `stable` or `buster`.")
     parser.add_argument("--area", default="main", help="Archive area. For example, `main`, `contrib`, `non-free`.")
