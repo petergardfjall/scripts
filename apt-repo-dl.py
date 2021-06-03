@@ -78,7 +78,7 @@ Examples:
     # get Packages.gz
     apt-repo-dl.py --repo=http://dl.google.com/linux/chrome/deb --dist=stable packages
     # get Sources.gz
-    apt-repo-dl.py --repo=https://deb.nodesource.com/node_12.x --dist=focal sources
+    apt-repo-dl.py --repo=http://archive.canonical.com/ubuntu --dist=focal --area=partner sources
 
     apt-repo-dl.py --repo=http://packages.microsoft.com/repos/code --dist=stable --area=main --arch=arm64 packages
 """
