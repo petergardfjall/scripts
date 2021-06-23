@@ -5,6 +5,7 @@ from argparse import HelpFormatter, RawTextHelpFormatter
 from datetime import datetime, timedelta
 import gzip
 import http.client
+from io import StringIO
 import logging
 import json
 import os
@@ -22,11 +23,11 @@ if 'LOG_LEVEL' in os.environ:
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stdout)
 
-def read_to(f :typing.IO[str], line_prefix :str) -> typing.Optional[str]:
+def read_to(f :typing.IO[str], regexp :str) -> typing.Optional[str]:
     """Reads lines from a file until one is encountered with the given
     line_prefix or EOF is reached. The latter is indicated by a None return."""
     for line in f:
-        if line.startswith(line_prefix):
+        if re.match(regexp, line):
             return line
     return None
 
@@ -117,27 +118,45 @@ class Archive:
         self._download_to(self.sources_url(), dest_path)
 
     def list_packages(self):
-        pkgs_file = self.packages_cache_path()
-        if not os.path.isfile(pkgs_file) or (file_age(pkgs_file) > self.max_cache_age):
-            LOG.debug("downloading new Packages.gz file to %s", pkgs_file)
-            self.download_packages(pkgs_file)
-        else:
-            LOG.debug("reusing cached %s (age: %d seconds)", pkgs_file, file_age(pkgs_file))
-
+        pkgs_file = self._update_packages_cache()
         pkgs = []
         with gzip.open(pkgs_file, mode='rt', encoding='utf-8') as f:
             while True:
-                line = read_to(f, 'Package: ')
+                line = read_to(f, '^Package: ')
                 if line is None:
                     break
                 pkg_name = re.match(r'^Package: (.*)$', line)[1]
-                line = read_to(f, 'Version: ')
+                line = read_to(f, '^Version: ')
                 if line is None:
                     break
                 pkg_version = re.match(r'^Version: (.*)$', line)[1]
                 pkgs.append(f'{pkg_name}@{pkg_version}')
             return pkgs
 
+    def _update_packages_cache(self) -> str:
+        pkgs_file = self.packages_cache_path()
+        if not os.path.isfile(pkgs_file) or (file_age(pkgs_file) > self.max_cache_age):
+            LOG.debug("downloading new Packages.gz file to %s", pkgs_file)
+            self.download_packages(pkgs_file)
+        else:
+            LOG.debug("reusing cached %s (age: %d seconds)", pkgs_file, file_age(pkgs_file))
+        return pkgs_file
+
+    def get_pkg_paragraph(self, pkg :str) -> str:
+        pkgs_file = self._update_packages_cache()
+
+        buf = StringIO()
+        with gzip.open(pkgs_file, mode='rt', encoding='utf-8') as f:
+            line = read_to(f, f'^Package: {pkg}$')
+            if line is None:
+                raise ValueError(f'no such package: {pkg}')
+            buf.write(line)
+            for line in f:
+                if not line.strip():
+                    break
+                buf.write(line)
+
+        return buf.getvalue()
 
 def download_packages_file(args):
     """Implementation of the `download-packages-file` subcommand."""
@@ -155,11 +174,15 @@ def components(args):
     archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
     print(archive.get_release_components())
 
-
 def list_packages(args):
     """Implementation of the `list-packages` subcommand."""
     archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
     print(json.dumps(archive.list_packages(), indent=2))
+
+def show_package(args):
+    """Implementation of the `show-package` subcommand."""
+    archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
+    print(archive.get_pkg_paragraph(args.package))
 
 
 DESCRIPTION="""
@@ -203,6 +226,10 @@ if __name__ == "__main__":
 
     list_packages_cmd = subparsers.add_parser("list-packages", help="List all packages found in the Packages.gz archive")
     list_packages_cmd.set_defaults(action=list_packages)
+
+    show_package_cmd = subparsers.add_parser("show-package", help="Show a particular package found in the Packages.gz archive")
+    show_package_cmd.add_argument("package", help="Package name")
+    show_package_cmd.set_defaults(action=show_package)
 
     components_cmd = subparsers.add_parser("components", help="Discover release components for a particular repo+distro.")
     components_cmd.set_defaults(action=components)
