@@ -89,7 +89,9 @@ class Archive:
 
     def _download_to(self, url:str, dest_path:str):
         LOG.debug("downloading %s to %s ...", url, dest_path)
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        path_dir = os.path.dirname(dest_path)
+        if path_dir:
+            os.makedirs(path_dir, exist_ok=True)
         u = urlparse(url)
         conn = self._connect(u)
         try:
