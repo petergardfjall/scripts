@@ -195,11 +195,14 @@ The LOG_LEVEL environment variable controls log output.
 Examples:
 
     # get Packages.gz
-    apt-repo-dl.py --repo=http://dl.google.com/linux/chrome/deb --dist=stable packages
-    # get Sources.gz
-    apt-repo-dl.py --repo=http://archive.canonical.com/ubuntu --dist=focal --component=partner sources
+    apt-inspect.py --repo=http://dl.google.com/linux/chrome/deb --dist=stable donload-packages-file
 
-    apt-repo-dl.py --repo=http://packages.microsoft.com/repos/code --dist=stable --component=main --arch=arm64 packages
+    # get Sources.gz
+    apt-inspect.py --repo=http://archive.canonical.com/ubuntu --dist=focal --component=partner download-sources-file
+
+    apt-inspect.py --repo=http://packages.microsoft.com/repos/code --dist=stable --component=main --arch=arm64 list-packages
+
+    apt-inspect.py --repo=http://packages.microsoft.com/repos/code --dist=stable --component=main --arch=arm64 show-package curl
 """
 
 class MyHelpFormatter(argparse.ArgumentDefaultsHelpFormatter,argparse.RawTextHelpFormatter):
