@@ -82,6 +82,9 @@ class Archive:
             conn.request("GET", u.path)
             resp = conn.getresponse()
             if not resp.status == 200:
+                if resp.status in [301,302]:
+                    redirect_url = str(resp.getheader('location'))
+                    return self._get(redirect_url)
                 raise ValueError(f'http error: {resp.status}')
             return resp.read().decode("utf-8")
         finally:
@@ -98,6 +101,10 @@ class Archive:
             conn.request("GET", u.path)
             resp = conn.getresponse()
             if not resp.status == 200:
+                if resp.status in [301,302]:
+                    redirect_url = str(resp.getheader('location'))
+                    self._download_to(redirect_url, dest_path)
+                    return
                 raise ValueError(f'http error: {resp.status}')
             with resp as src:
                 with open(dest_path, "wb") as dst:
