@@ -37,7 +37,7 @@ def file_age(path :str) -> int:
     return delta.seconds
 
 class Archive:
-    def __init__(self, repo, dist, area, arch, max_cache_age:int=3600):
+    def __init__(self, repo, dist, component, arch, max_cache_age:int=3600):
         """Initialize an Archive.
 
         :keyword max_cache_age: If an already downloaded Packages.gz/Sources.gz
@@ -45,15 +45,15 @@ class Archive:
         """
         self.repo = repo.strip('/')
         self.dist = dist.strip('/')
-        self.area = area.strip('/')
+        self.component = component.strip('/')
         self.arch = arch.strip('/')
         self.max_cache_age = max_cache_age
 
     def packages_url(self):
-        return f'{self.repo}/dists/{self.dist}/{self.area}/binary-{self.arch}/Packages.gz'
+        return f'{self.repo}/dists/{self.dist}/{self.component}/binary-{self.arch}/Packages.gz'
 
     def sources_url(self):
-        return f'{self.repo}/dists/{self.dist}/{self.area}/source/Sources.gz'
+        return f'{self.repo}/dists/{self.dist}/{self.component}/source/Sources.gz'
 
     def packages_cache_path(self):
         scheme = urlparse(self.packages_url()).scheme + "://"
@@ -162,28 +162,28 @@ class Archive:
 
 def download_packages_file(args):
     """Implementation of the `download-packages-file` subcommand."""
-    archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
+    archive = Archive(repo=args.repo, dist=args.dist, component=args.component, arch=args.arch, max_cache_age=args.max_cache_age)
     archive.download_packages(args.dest_path)
 
 
 def download_sources_file(args):
     """Implementation of the `download-sources-file` subcommand."""
-    archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
+    archive = Archive(repo=args.repo, dist=args.dist, component=args.component, arch=args.arch, max_cache_age=args.max_cache_age)
     archive.download_sources(args.dest_path)
 
 def components(args):
     """Implementation of the `components` subcommand."""
-    archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
+    archive = Archive(repo=args.repo, dist=args.dist, component=args.component, arch=args.arch, max_cache_age=args.max_cache_age)
     print(archive.get_release_components())
 
 def list_packages(args):
     """Implementation of the `list-packages` subcommand."""
-    archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
+    archive = Archive(repo=args.repo, dist=args.dist, component=args.component, arch=args.arch, max_cache_age=args.max_cache_age)
     print(json.dumps(archive.list_packages(), indent=2))
 
 def show_package(args):
     """Implementation of the `show-package` subcommand."""
-    archive = Archive(repo=args.repo, dist=args.dist, area=args.area, arch=args.arch, max_cache_age=args.max_cache_age)
+    archive = Archive(repo=args.repo, dist=args.dist, component=args.component, arch=args.arch, max_cache_age=args.max_cache_age)
     print(archive.get_pkg_paragraph(args.package))
 
 
@@ -197,9 +197,9 @@ Examples:
     # get Packages.gz
     apt-repo-dl.py --repo=http://dl.google.com/linux/chrome/deb --dist=stable packages
     # get Sources.gz
-    apt-repo-dl.py --repo=http://archive.canonical.com/ubuntu --dist=focal --area=partner sources
+    apt-repo-dl.py --repo=http://archive.canonical.com/ubuntu --dist=focal --component=partner sources
 
-    apt-repo-dl.py --repo=http://packages.microsoft.com/repos/code --dist=stable --area=main --arch=arm64 packages
+    apt-repo-dl.py --repo=http://packages.microsoft.com/repos/code --dist=stable --component=main --arch=arm64 packages
 """
 
 class MyHelpFormatter(argparse.ArgumentDefaultsHelpFormatter,argparse.RawTextHelpFormatter):
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=MyHelpFormatter)
     parser.add_argument("--repo", default="https://ftp.debian.org/debian", help="APT repository such as `http://se.archive.ubuntu.com/ubuntu`.")
     parser.add_argument("--dist", default="stable", help="Distribution. For example `focal`, `stable` or `buster`.")
-    parser.add_argument("--area", default="main", help="Archive area. For example, `main`, `contrib`, `non-free`.")
+    parser.add_argument("--component", default="main", help="Release component. For example, `main`, `contrib`, `non-free`.")
     parser.add_argument("--arch", default="amd64", help="Architecture (only relevant for binary packages). For example `i386`, `amd64`.")
     parser.add_argument("--verbose", action='store_true', default=False, help="Print body in error responses.")
     parser.add_argument("--max-cache-age", type=int, default=86400, help="Max cache age in seconds.")
