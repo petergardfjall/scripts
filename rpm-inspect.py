@@ -187,11 +187,14 @@ The LOG_LEVEL environment variable controls log output.
 
 Examples:
 
-    # get Packages.gz
-    rpm-inspect.py --repo=http://mirror.nsc.liu.se/centos-store/8.4.2105/BaseOS/Source download-package-list
+    # download primary.xml.gz
+    rpm-inspect.py --repo=http://mirror.centos.org/centos/7/os/x86_64 download-package-list --dest=centos-7-bin.xml.gz
+    rpm-inspect.py --repo=https://vault.centos.org/7.9.2009/os/Source download-package-list --dest=centos-7-src.xml.gz
 
+    # list packages
     rpm-inspect.py --repo=http://mirror.centos.org/centos/8/AppStream/x86_64/os/ list-packages
 
+    # show a particular package
     rpm-inspect.py --repo=http://download.opensuse.org/tumbleweed/repo/src-oss show-package curl
 """
 
