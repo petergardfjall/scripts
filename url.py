@@ -5,7 +5,7 @@ import urllib.parse
 import sys
 
 def encode(args):
-    print(urllib.parse.quote(args.value))
+    print(urllib.parse.quote(args.value, safe=''))
 
 def decode(args):
     print(urllib.parse.unquote(args.url))
