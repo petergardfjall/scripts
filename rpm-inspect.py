@@ -131,6 +131,8 @@ class Archive:
             for event, node in event_stream:
                 if event == xml.dom.pulldom.START_ELEMENT and node.tagName == "package":
                     event_stream.expandNode(node)
+                    # merge text nodes that are split into multiple child nodes
+                    node.normalize()
                     name_elem = node.getElementsByTagName('name')[0]
                     v_elem = node.getElementsByTagName('version')[0]
                     arch_elem = node.getElementsByTagName('arch')[0]
@@ -147,10 +149,12 @@ class Archive:
             for event, node in event_stream:
                 if event == xml.dom.pulldom.START_ELEMENT and node.tagName == "package":
                     event_stream.expandNode(node)
+                    # merge text nodes that are split into multiple child nodes
+                    node.normalize()
                     name_elem = node.getElementsByTagName('name')[0]
                     pkg_name = name_elem.firstChild.nodeValue
                     if pkg_name == package_name:
-                        return node.toprettyxml(indent='  ', newl='')
+                        return node.toprettyxml(indent='', newl='')
         return None
 
     def _update_package_list_cache(self) -> str:

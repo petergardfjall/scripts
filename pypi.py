@@ -4,11 +4,16 @@ import argparse
 import http.client
 import logging
 import json
+import re
 import sys
 from urllib.parse import urlparse
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+
+PACKAGE_LINK = re.compile(r'<a href="[^"]+">([^<]+)</a>')
+"""Pattern that matches a package link in the PyPi simple project API"""
 
 class Response:
     def __init__(self, http_response):
@@ -43,16 +48,27 @@ def get_package_metadata(package_index, package, version=None):
     return get(f"https://{package_index}/pypi/{pkg_path}/json")
 
 
+
+
 def get_package_metadata_or_die(package_index, package, version=None):
     """Return a dict holding the metadata for a certain package."""
     resp = get_package_metadata(package_index, package, version)
     if resp.status != 200:
         LOG.error("pypi.org query failed: %d (%s)", resp.status, resp.reason)
-        if args.verbose:
-            LOG.error("%s", resp.body)
         sys.exit(1)
     return json.loads(resp.body)
 
+def list_packages_or_die(package_index):
+    resp = get(f"https://{package_index}/simple")
+    if resp.status != 200:
+        LOG.error("pypi.org query failed: %d (%s)", resp.status, resp.reason)
+        sys.exit(1)
+    pkgs = []
+    for line in resp.body.split('\n'):
+        m = PACKAGE_LINK.match(line.lstrip())
+        if m:
+            pkgs.append(m.group(1))
+    return pkgs
 
 def sdist(args):
     """Implementation of the `sdist` subcommand."""
@@ -88,6 +104,11 @@ def show(args):
     pkg = get_package_metadata_or_die(args.package_index, args.package, args.version)
     print(json.dumps(pkg, indent=4))
 
+def list_packages(args):
+    """Implementation of the `list` subcommand."""
+    pkg = list_packages_or_die(args.package_index)
+    print(json.dumps(pkg, indent=4))
+
 
 
 if __name__ == "__main__":
@@ -96,6 +117,9 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action='store_true', default=False, help="Print body in error responses.")
 
     subparsers = parser.add_subparsers(help="subcommands")
+
+    list_cmd = subparsers.add_parser("list", help="List all PyPi package names")
+    list_cmd.set_defaults(action=list_packages)
 
     show_cmd = subparsers.add_parser("show", help="Show all PyPi metadata for a package")
     show_cmd.add_argument(
@@ -124,9 +148,7 @@ if __name__ == "__main__":
     bdists_cmd.set_defaults(action=bdists)
 
 
-
     args = parser.parse_args()
-
     if not hasattr(args, "action"):
         print("please specify a subcommand (--help for usage)")
         sys.exit(1)
