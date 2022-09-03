@@ -18,7 +18,7 @@ log = logging.getLogger()
 
 request_count = 0
 
-class HttpServer(socketserver.TCPServer):
+class HttpServer(socketserver.ThreadingTCPServer):
     # prevent "Address already in use" error when restarting the server program
     # after a socket has been opened
     allow_reuse_address = True
