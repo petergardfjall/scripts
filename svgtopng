@@ -84,5 +84,5 @@ if [ -n "${width}" ]; then
     options="${options} --export-width=${width}"
 fi
 
-inkscape --export-use-hints --export-area-drawing --export-dpi=200 ${options} \
-	 --export-png=${dest_png} ${source_svg}
+inkscape --export-area-page --export-dpi=200 ${options} \
+         --export-type=png --export-filename=${dest_png} ${source_svg}
