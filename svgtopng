@@ -39,28 +39,28 @@ function die() {
 
 for arg in $@; do
     case ${arg} in
-	--background=*)
-	    background=${arg#*=}
-	    ;;
-	--opacity=*)
-	    opacity=${arg#*=}
-	    ;;
-	--height=*)
-	    height=${arg#*=}
-	    ;;
-	--width=*)
-	    width=${arg#*=}
-	    ;;
-	--help)
-	    print_usage
-	    exit 0
-	    ;;
-	--*)
-	    die "error: unrecognized option: ${arg}"
-	    ;;
-	*)
-	    # assume only positional arguments left
-	    break
+        --background=*)
+            background=${arg#*=}
+            ;;
+        --opacity=*)
+            opacity=${arg#*=}
+            ;;
+        --height=*)
+            height=${arg#*=}
+            ;;
+        --width=*)
+            width=${arg#*=}
+            ;;
+        --help)
+            print_usage
+            exit 0
+            ;;
+        --*)
+            die "error: unrecognized option: ${arg}"
+            ;;
+        *)
+            # assume only positional arguments left
+            break
     esac
     shift
 done
