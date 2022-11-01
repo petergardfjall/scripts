@@ -1,0 +1,28 @@
+#!/bin/bash
+
+self="$(basename ${0})"
+
+function usage {
+    echo "Usage: ${self} <offset-start> <length>"
+    echo ""
+    echo 'Reads from stdin and prints the given byte range.'
+}
+
+function die {
+    echo -e "\e[31merror: ${1}\e[0m"
+    usage
+    exit 1
+}
+
+
+[ -z "${1}" ] && die "no offset-start byte given"
+offset_start="${1}"
+[ "${offset_start}" -lt 0 ] && die "offset-start cannot be negative"
+
+[ -z "${2}" ] && die "no length given"
+len="${2}"
+[ "${len}" -lt 0 ] && die "length cannot be negative"
+
+# Note tail starts its count at byte 1 (not 0).
+offset_start=$(( offset_start + 1 ))
+tail --bytes=+"${offset_start}" <&0 | head --bytes=+"${len}"
