@@ -27,7 +27,10 @@ len="${2}"
 offset_start=$(( offset_start + 1 ))
 # Make all output bytes be highlighted (except for control characters of course).
 echo -en "\e[1;42m"
-tail --bytes=+"${offset_start}" <&0 | head --bytes=+"${len}"
+# Highlight newline characters that are included in the byte slice by (1) using
+# tr to replace each newline with RS (record separator, octal: 037) and (2) sed
+# to turn the RS into a middle dot followed by newline.
+tail --bytes=+"${offset_start}" <&0 | head --bytes=+"${len}" | tr '\n' '\037'  | sed 's/\o37/·\n/g'
 # Reset coloring.
 # \x1b[K erases line from cursor to EOL (needed to not get background coloring
 # of entire last line). "\x1b" is the ascii escape sequence, "[0K" is the
