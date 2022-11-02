@@ -3,9 +3,12 @@
 self="$(basename ${0})"
 
 function usage {
-    echo "Usage: ${self} <offset-start> <length>"
+    echo "Usage: ${self} [OPTIONS] <offset-start> <length>"
     echo ""
     echo 'Reads from stdin and prints the given byte range.'
+    echo
+    echo "Options:"
+    echo "   --raw    Don't highlight output. Output only the raw byte sequence."
 }
 
 function die {
@@ -14,6 +17,27 @@ function die {
     exit 1
 }
 
+
+raw_output="false"
+for arg in ${@}; do
+    case ${arg} in
+        --raw)
+            raw_output="true"
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        --*)
+            die "unrecognized option: ${arg}"
+            ;;
+        *)
+            # no option, assume only positional arguments left
+            break
+            ;;
+        esac
+    shift
+done
 
 [ -z "${1}" ] && die "no offset-start byte given"
 offset_start="${1}"
@@ -25,14 +49,19 @@ len="${2}"
 
 # Note tail starts its count at byte 1 (not 0).
 offset_start=$(( offset_start + 1 ))
-# Make all output bytes be highlighted (except for control characters of course).
-echo -en "\e[1;42m"
-# Highlight newline characters that are included in the byte slice by (1) using
-# tr to replace each newline with RS (record separator, octal: 037) and (2) sed
-# to turn the RS into a middle dot followed by newline.
-tail --bytes=+"${offset_start}" <&0 | head --bytes=+"${len}" | tr '\n' '\037'  | sed 's/\o37/·\n/g'
-# Reset coloring.
-# \x1b[K erases line from cursor to EOL (needed to not get background coloring
-# of entire last line). "\x1b" is the ascii escape sequence, "[0K" is the
-# command meaning: "erase the current line from cursor".
-echo -e "\e[0m\x1b[0K"
+
+if [ "${raw_output}" = "true" ]; then
+    tail --bytes=+"${offset_start}" <&0 | head --bytes=+"${len}"
+else
+    # Highlight all output bytes.
+    echo -en "\e[1;42m"
+    # Highlight newline characters that are included in the byte slice by (1)
+    # using tr to replace each newline with RS (record separator, octal: 037)
+    # and (2) sed to turn the RS into a middle dot followed by newline.
+    tail --bytes=+"${offset_start}" <&0 | head --bytes=+"${len}" | tr '\n' '\037'  | sed 's/\o37/·\n/g'
+    # Reset coloring.  \x1b[K erases line from cursor to EOL (needed to not get
+    # background coloring of entire last line). "\x1b" is the ascii escape
+    # sequence, "[0K" is the command meaning: "erase the current line from
+    # cursor".
+    echo -e "\e[0m\x1b[0K"
+fi
