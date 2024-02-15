@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import argparse
+from datetime import datetime, timezone
 import http.client
 import logging
 import json
@@ -98,6 +99,21 @@ def keyword_search(args):
     cves = all_cves(f'{args.cve_api_url}?keywordSearch={encoded_keywords}', page_size=args.page_size)
     print(pretty_json(cves))
 
+def list_cve_updates(args):
+    """Implementation of the `search` subcommand."""
+    if not args.since:
+        raise ValueError('missing since')
+    if not args.until:
+        raise ValueError('missing until')
+
+    since = datetime.strptime(args.since, '%Y-%m-%dT%H:%M:%S.%f').astimezone(tz=timezone.utc)
+    until = datetime.strptime(args.until, '%Y-%m-%dT%H:%M:%S.%f').astimezone(tz=timezone.utc)
+    encoded_since = urllib.parse.quote(since.strftime('%Y-%m-%dT%H:%M:%S.%f'), safe='')
+    encoded_until = urllib.parse.quote(until.strftime('%Y-%m-%dT%H:%M:%S.%f'), safe='')
+    cves = all_cves(f'{args.cve_api_url}?lastModStartDate={encoded_since}&lastModEndDate={encoded_until}', page_size=args.page_size)
+    print(pretty_json(cves))
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="""Fetches vulnerabilities (CVEs) from NVD's API.
@@ -113,6 +129,12 @@ See https://nvd.nist.gov/developers/vulnerabilities
     get_cmd = subparsers.add_parser("get", help="Retrieve a particular CVE.")
     get_cmd.add_argument("cve", help="CVE identifier. For example, CVE-1999-0095.")
     get_cmd.set_defaults(action=get_cve)
+
+    list_updates_cmd = subparsers.add_parser("list-updates", help="List CVEs updated since a given time.")
+    list_updates_cmd.add_argument("since", help="List CVE updates since this point in time (in local time). Format: 2006-01-02T15:04:05.999")
+    list_updates_cmd.add_argument("--until", default=datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f'),
+                                  help="The end time for the update query (in local time). Default: current time. Format: 2006-01-02T15:04:05.999")
+    list_updates_cmd.set_defaults(action=list_cve_updates)
 
     search_cmd = subparsers.add_parser("search", help="Search for CVEs with matching keywords in its description.")
     search_cmd.add_argument("keyword", nargs="+", help="Keyword to search for (option can occur multiple times).")
