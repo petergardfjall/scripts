@@ -1,0 +1,51 @@
+#!/bin/bash
+
+set -e
+
+here=$(realpath $(dirname ${0}))
+# Downloaded from https://raw.githubusercontent.com/chalda-pnuzig/emojis.json/15.0/src/list.json
+emoji_dir="${here}/emojis"
+
+function die {
+    echo "error: ${1}"
+    echo
+    echo "Usage: $(basename ${0}) list|search|echo"
+    exit 1
+}
+
+function list {
+    cmd="cat ${emoji_dir}/list.json | jq -cr '.emojis[] | {\"code\":.code[0], \"emoji\": .emoji, \"name\": .name}'"
+    eval ${cmd} | while read entry; do
+        echo $entry
+    done
+}
+
+function search {
+    term="${1}"
+    list | grep -i ${term}
+}
+
+function print_echo_cmd {
+    code="${1}"
+    unicode="\U000${code}"
+    echo "echo -e '${unicode}'"
+}
+
+[ -z "${1}" ] && die "no subcommand given"
+case "${1}" in
+    list)
+        list
+    ;;
+    search)
+        shift
+        [ -z "${1}" ] && die "expected a search term"
+        search "${1}"
+        ;;
+    echo)
+        shift
+        [ -z "${1}" ] && die "expected a code"
+        print_echo_cmd "${1}"
+        ;;
+    *)
+        die "unrecognized command: ${1}"
+esac
