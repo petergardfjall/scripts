@@ -8,6 +8,7 @@ if [ -n "${1}" ]; then
 fi
 
 echo "opening godoc server on localhost:${port} ..."
+pkill pkgsite || true
 pkgsite -http :${port} &
 sleep 0.5
 xdg-open http://localhost:${port}
