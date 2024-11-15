@@ -27,10 +27,11 @@ fi
 # Make sure the `traffic-manager` is installed in the cluster. Allow
 # intercepting pods with long-running init containers.
 info "installing traffic-manager ..."
-output=$(${telepresence_bin} helm install --set timeouts.agentArrival=5m 2>&1 || true)
+opts="--set timeouts.agentArrival=5m --set agent.securityContext.runAsNonRoot=false"
+output=$(${telepresence_bin} helm install ${opts} 2>&1 || true)
 if [[ "${output}" =~ "already installed" ]]; then
     info "upgrading traffic-manager ..."
-    ${telepresence_bin} helm upgrade --set timeouts.agentArrival=5m
+    ${telepresence_bin} helm upgrade ${opts}
 fi
 
 # Connect laptop to traffic-manager
