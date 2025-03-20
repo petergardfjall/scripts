@@ -33,7 +33,7 @@ def get_json(url):
 
 
 def vendor_list(args):
-    data = get_json("https://cve.circl.lu/api/browse")
+    data = get_json("https://cve.circl.lu/api/browse/")
     print(json.dumps(data, indent=4))
 
 
@@ -41,14 +41,14 @@ def vendor_products(args):
     data = get_json("https://cve.circl.lu/api/browse/{}".format(args.vendor))
     print(json.dumps(data, indent=4))
 
-    
+
 def cve_byvp(args):
     """Search CVEs by vendor and product."""
     data = get_json("https://cve.circl.lu/api/search/{v}/{p}".format(
         v=args.vendor, p=args.product))
     print(json.dumps(data, indent=4))
 
-    
+
 def cve_byid(args):
     """Search CVEs by ID (CVE-2016-3333)."""
     data = get_json("https://cve.circl.lu/api/cve/{id}".format(id=args.id))
@@ -58,7 +58,7 @@ def cve_bycpe(args):
     """Search CVEs by CPE (cpe:2.3:a:vmware:springsource_spring_framework:*:*:*:*:*:*:*:*)."""
     data = get_json("https://cve.circl.lu/api/cvefor/{cpe}".format(cpe=args.cpe))
     print(json.dumps(data, indent=4))
-    
+
 
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION)
@@ -83,7 +83,7 @@ def main():
     cve_bycpe_parser = subparsers.add_parser("cve-bycpe", help="list CVEs for a CPE.")
     cve_bycpe_parser.add_argument("cpe", metavar="cpe", help="The CPE URI (such as cpe:2.3:a:vmware:springsource_spring_framework:*:*:*:*:*:*:*:*).")
     cve_bycpe_parser.set_defaults(func=cve_bycpe)
-    
+
     args = parser.parse_args()
     if not "func" in args:
         parser.print_help()
