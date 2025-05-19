@@ -44,11 +44,16 @@ for arg in ${@}; do
     shift
 done
 
-[ -z "${1}" ] && die "no file given"
-file=${1}
-
 start_offset=$(( ${start} + 1 ))
-command="cat ${file} | tail --bytes=+${start_offset}"
+
+if [ -z "${1}" ]; then
+    # no file => read from stdin
+    command="tail --bytes=+${start_offset}"
+else
+    file=${1}
+    command="cat ${file} | tail --bytes=+${start_offset}"
+fi
+
 if [ "${end}" -ge 0 ]; then
     count=$(( ${end} - ${start} + 1 ))
     command="${command} | head --bytes=${count}"
