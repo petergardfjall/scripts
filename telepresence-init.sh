@@ -36,7 +36,7 @@ fi
 
 # Connect laptop to traffic-manager
 info "connecting to traffic-manager ..."
-${telepresence_bin} connect
+${telepresence_bin} connect --progress=plain
 
 ${telepresence_bin} status
 info "telepresence ready."

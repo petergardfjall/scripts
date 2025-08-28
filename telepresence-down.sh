@@ -20,7 +20,7 @@ if [[ "${current_ctx}" != *kind* ]]; then
 fi
 
 info "uninstalling all intercepts ..."
-${telepresence_bin} uninstall --all-agents
+${telepresence_bin} uninstall --all-agents || true
 
 info "uninstalling traffic-manager ..."
 ${telepresence_bin} helm uninstall || true
