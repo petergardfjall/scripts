@@ -9,7 +9,7 @@ function info {
 }
 
 function die {
-    error "${1}"
+    echo -e "\e[31minfo: ${1}\e[0m"
     exit 1
 }
 
