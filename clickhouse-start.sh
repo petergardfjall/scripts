@@ -12,7 +12,7 @@
 # After starting up you can use the server with a call like:
 #   echo 'SELECT version();' | curl --user clickhouse:password http://localhost:8123/ --data-binary @-
 #
-#   clickhouse-client --user=clickhouse --password=password
+#   clickhouse-client --user=clickhouse --password=password [--query '<query>']
 #
 
 set -e
