@@ -8,6 +8,10 @@ function info {
     echo -e "\e[32minfo: ${1}\e[0m"
 }
 
+function warn {
+    echo -e "\e[33mwarning: ${1}\e[0m"
+}
+
 function error {
     echo -e "\e[31merror: ${1}\e[0m"
 }
@@ -40,3 +44,7 @@ ${telepresence_bin} connect --progress=plain
 
 ${telepresence_bin} status
 info "telepresence ready."
+
+if ! grep ^user_allow_other /etc/fuse.conf > /dev/null; then
+    warn "To allow local mounting of pod volumes make sure user_allow_other is enabled in /etc/fuse.conf."
+fi
