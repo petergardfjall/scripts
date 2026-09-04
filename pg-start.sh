@@ -35,7 +35,7 @@ docker run -d --rm --name="${container_name}" \
        -e POSTGRES_USER=${POSTGRES_USER} \
        -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
        -e TZ=UTC ${host_volume_opts} \
-       postgres:16
+       postgres:17
 
 function cleanup {
     echo "exit: killing postgres container ..."
