@@ -15,6 +15,7 @@ function print_usage() {
     echo ""
     echo "Options:"
     echo "  --show-tags          Show available tags for each image."
+    echo "  --auth-token         A basic auth token to access the remote registry."
     echo "  --help               Prints help text."
 }
 
@@ -26,20 +27,23 @@ function die_with_msg() {
 show_tags=false
 for arg in ${@}; do
     case ${arg} in
-	--show-tags)
-	    show_tags=true
-	    ;;
-	--help)
-	    print_usage
-	    exit 0
-	    ;;
-	--*)
-	    die_with_msg "unrecognized option: ${arg}"
-	    ;;
-	*)
-	    # assume only positional args left
-	    break
-	    ;;
+        --show-tags)
+            show_tags=true
+            ;;
+        --auth-token=*)
+            auth_token=${arg/*=/}
+            ;;
+        --help)
+            print_usage
+            exit 0
+            ;;
+        --*)
+            die_with_msg "unrecognized option: ${arg}"
+            ;;
+        *)
+            # assume only positional args left
+            break
+            ;;
     esac
     shift
 done
@@ -50,19 +54,20 @@ fi
 registry="${1}"
 
 # try to find credentials for registry
-source_creds=$(cat ~/.docker/config.json | jq -r --arg registry ${registry} '.auths | with_entries(select(.key | contains($registry))) | .[].auth' | head -1)
-if [ "${source_creds}" = "null" ]; then
-    die_with_msg "error: no credentials found for ${registry} in ~/.docker/config.json"
+if [ -z "${auth_token}" ]; then
+    auth_token=$(cat ~/.docker/config.json | jq -r --arg registry ${registry} '.auths | with_entries(select(.key | contains($registry))) | .[].auth' | head -1)
+    if [ -z "${auth_token}" ] || [ "${auth_token}" = "null" ]; then
+        die_with_msg "no credentials found for ${registry} in ~/.docker/config.json (can also be supplied with --token)"
+    fi
+    # base64 decode credentials
+    auth_token=$(echo ${auth_token} | base64 -d)
 fi
 
-# base64 decode credentials
-source_creds=$(echo ${source_creds} | base64 -d)
-images=$(curl --silent --user ${source_creds} https://${registry}/v2/_catalog | jq -r '.repositories[]')
+images=$(curl --silent --user ${auth_token} https://${registry}/v2/_catalog | jq -r '.repositories[]')
 for image in ${images}; do
     tags=""
     if ${show_tags}; then
-	tags=$(curl --silent --user ${source_creds} https://${registry}/v2/${image}/tags/list | jq -r --sort-keys '.tags[]' | xargs echo)
+        tags=$(curl --silent --user ${auth_token} https://${registry}/v2/${image}/tags/list | jq -r --sort-keys '.tags[]' | xargs echo)
     fi
     echo "${image}: ${tags}"
 done
-
